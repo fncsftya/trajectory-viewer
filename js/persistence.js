@@ -64,3 +64,11 @@ export function replaceState(data) {
   catch { state.restoring = false; throw new Error('Could not store the state (browser storage full or blocked).'); }
   location.reload();
 }
+
+// Clears the stored state and reloads into a clean app.
+export function resetState() {
+  state.restoring = true; // stop the pagehide save from writing the current state back
+  try { localStorage.removeItem(STORE_KEY); }
+  catch { state.restoring = false; throw new Error('Could not clear the stored state (browser storage blocked).'); }
+  location.reload();
+}

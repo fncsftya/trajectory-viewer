@@ -1,6 +1,6 @@
 import { $ } from './dom.js';
 import { state, pairs } from './state.js';
-import { saveNow, loadState, dumpState, parseStateFile, replaceState } from './persistence.js';
+import { saveNow, loadState, dumpState, parseStateFile, replaceState, resetState } from './persistence.js';
 import { show, addPair, openSettings } from './tabs.js';
 import { addView } from './views.js';
 import { initEvaluate } from './evaluate.js';
@@ -24,13 +24,14 @@ export function restore(saved) {
 initDiagnostics();
 $('#add').onclick = () => addPair();
 $('#settings').onclick = openSettings;
-$('#state-save').onclick = () => {
+function downloadState() {
   const a = document.createElement('a');
   const url = a.href = URL.createObjectURL(new Blob([dumpState()], { type: 'application/json' }));
   a.download = `json-viewer-state-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
+}
+$('#state-save').onclick = downloadState;
 $('#state-load').onclick = () => $('#state-file').click();
 $('#state-file').onchange = async e => {
   const file = e.target.files[0];
@@ -41,6 +42,12 @@ $('#state-file').onchange = async e => {
     if (!confirm('Replace all current tabs, views and evaluation notes with the contents of this file?')) return;
     replaceState(data);
   } catch (err) { alert(err.message); }
+};
+$('#reset-all').onclick = () => {
+  if (!confirm('Reset everything? This deletes all tabs, views and evaluation notes and cannot be undone.\n\nA backup of the current state will be downloaded first.')) return;
+  downloadState();
+  // Give the browser a moment to start the download before the reload.
+  setTimeout(() => { try { resetState(); } catch (err) { alert(err.message); } }, 500);
 };
 // Clicking the backdrop (the dialog element itself, outside its content box) closes it; Esc is built in.
 $('#settings-modal').addEventListener('mousedown', e => {
