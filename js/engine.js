@@ -18,7 +18,15 @@ export const isEmptyVal = v => missing(v) || (typeof v === 'string' && !v.trim()
 
 // Child lookup that maps over arrays, so a path through an array yields an array of values.
 const pick = (v, k) => Array.isArray(v) ? v.map(x => pick(x, k)) : isContainer(v) ? v[k] : undefined;
+// Lookups that went wrong (e.g. an array index past the end), collected per render for the UI to show.
+export const warnings = new Set();
+let curRef = '';
 const step = (v, tok) => {
+  if (Array.isArray(v) && /^\d+$/.test(tok)) { // a number picks one element of an array
+    if (+tok < v.length) return v[+tok];
+    warnings.add(`$${curRef}: index ${tok} is out of bounds (array has ${v.length} item${v.length === 1 ? '' : 's'})`);
+    return undefined;
+  }
   if (Array.isArray(v)) return v.map(x => step(x, tok));
   if (v instanceof Entry) return tok === 'key' ? v.key : tok === 'value' ? v.value : undefined;
   if (!isContainer(v)) return undefined;
@@ -30,9 +38,10 @@ const dive = (v, toks) => toks.reduce(step, v);
 
 // Resolve `name__sub__path` (no $). A scope entry (match id or loop variable) wins; otherwise it's a path from the document root.
 let globalCache = new Map();
-export const resetGlobalCache = () => { globalCache = new Map(); };
+export const resetGlobalCache = () => { globalCache = new Map(); warnings.clear(); };
 export function lookup(ref, scope, root) {
   const [head, ...rest] = ref.split('__');
+  curRef = ref;
   if (Object.hasOwn(scope, head)) return { found: true, value: dive(scope[head], rest) };
   if (/^match\d+$/.test(head)) return { found: true, value: undefined }; // a selection with nothing for this output
   // Global (document-root) references are the same for every output, so resolve and format each once per render.

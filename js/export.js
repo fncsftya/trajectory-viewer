@@ -1,7 +1,7 @@
 import { $, el } from './dom.js';
 import { save } from './persistence.js';
 import { renderMarkdown, escHtml } from './markdown.js';
-import { fill, resetGlobalCache } from './engine.js';
+import { fill, resetGlobalCache, warnings } from './engine.js';
 import { buildSchema, newSchema } from './schema.js';
 import { attachAutocomplete } from './autocomplete.js';
 
@@ -32,6 +32,12 @@ function fillPreamble(text, patchText) {
   return fill(text, patchText === null ? {} : { patch: patchText }, ctx.root);
 }
 
+// Lookup problems in the current preamble, shown where errors go.
+function showWarnings() {
+  fillPreamble($('#ex-pre').value, ctx.patch);
+  $('#ex-err').textContent = warnings.size ? '⚠ ' + [...warnings].join('; ') : '';
+}
+
 function truncatePatch(text) {
   const lines = text.split('\n');
   let out = lines.slice(0, PREVIEW_PATCH_LINES).join('\n');
@@ -45,9 +51,9 @@ export function openExport(pair, view) {
   const xml = (view.allOuts ? view.allOuts() : []).join('\n');
   const pre = $('#ex-pre');
   pre.value = view.preamble || '';
-  pre.oninput = () => { view.preamble = pre.value; save(); }; // kept on every edit, so Cancel/Esc don't lose it
+  pre.oninput = () => { view.preamble = pre.value; save(); showWarnings(); }; // kept on every edit, so Cancel/Esc don't lose it
   $('#ex-info').textContent = `The XML (${xml.length.toLocaleString()} characters) will be copied in a code block.`;
-  $('#ex-err').textContent = '';
+  showWarnings();
   const build = () => {
     view.preamble = pre.value;
     const p = fillPreamble(pre.value, ctx.patch).trim();
@@ -66,7 +72,7 @@ export function openExport(pair, view) {
   };
   $('#ex-pre-save').onclick = () => {
     if (!pre.value) { $('#ex-err').textContent = 'The preamble is empty.'; return; }
-    $('#ex-err').textContent = '';
+    showWarnings();
     const url = URL.createObjectURL(new Blob([pre.value], { type: 'text/plain;charset=utf-8' }));
     const a = el('a');
     a.href = url;
@@ -84,7 +90,6 @@ export function openExport(pair, view) {
     try {
       pre.value = await f.text();
       pre.oninput();
-      $('#ex-err').textContent = '';
     } catch { $('#ex-err').textContent = 'Could not read that file.'; }
   };
   const setTab = tab => {

@@ -6,7 +6,7 @@ import { newSchema, describe, slug, entrySchema, isObj, kidsOf, kidByTok } from 
 export function resolveNode(ref, scope, schema = state.draft.schema) {
   const [head, ...rest] = ref.split('__');
   let node = Object.hasOwn(scope, head) ? scope[head] : kidByTok(schema, head);
-  for (const t of rest) node = kidByTok(node, t);
+  for (const t of rest) node = /^\d+$/.test(t) && node?.array ? node : kidByTok(node, t); // an index picks one element of an array
   return node || null;
 }
 
