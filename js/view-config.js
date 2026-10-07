@@ -128,6 +128,7 @@ function renderFilters() {
 export const currentCfg = () => ({
   v: 2, loop: [...state.draft.loop], as: asName(), filters: state.draft.filters.filter(p => p.length).map(p => [...p]),
   template: $('#vc-tpl').value, mode: state.draft.mode, xml: state.draft.xml,
+  pruneEmpty: $('#vc-prune').checked,
   wrap: { on: $('#vc-wrap').checked, tag: $('#vc-wrap-tag').value.trim() || 'root' },
   header: $('#vc-header').value, footer: $('#vc-footer').value,
 });
@@ -149,6 +150,7 @@ export function openConfigure(pair, view) {
   $('#vc-tpl').value = cfg ? cfg.template || '' : '';
   $('#vc-header').value = cfg?.header || '';
   $('#vc-footer').value = cfg?.footer || '';
+  $('#vc-prune').checked = !!cfg?.pruneEmpty;
   $('#vc-wrap').checked = !!cfg?.wrap?.on;
   $('#vc-wrap-tag').value = cfg?.wrap?.tag || 'root';
   state.draft.xml = structuredClone(cfg?.xml || []);

@@ -79,7 +79,7 @@ const escText = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g
 const escAttr = s => escText(s).replace(/"/g, '&quot;');
 
 // One output for a scope, or null if a required XML element is empty.
-export const outputOf = (cfg, scope, root) => cfg.mode === 'xml' ? (xmlLines(cfg.xml || [], scope, root)?.join('\n') ?? null) : fill(cfg.template || '', scope, root);
+export const outputOf = (cfg, scope, root) => cfg.mode === 'xml' ? (xmlLines(cfg.xml || [], scope, root, 0, !!cfg.pruneEmpty)?.join('\n') ?? null) : fill(cfg.template || '', scope, root);
 
 export const hasRequiredXml = nodes => nodes.some(n => n.required || hasRequiredXml(n.kids || []));
 
@@ -92,8 +92,9 @@ export function xmlName(s) {
 
 // Returns the lines, or null when a required element can't be filled (the whole output is then dropped).
 // An element marked `required` needs content: text, an attribute or children that resolved to something non-empty.
+// With `prune`, elements with no content (all refs empty, no literal text, no children left) are dropped; a dropped required element fails like an empty one.
 // A repeated element just skips instances that fail; it only fails the output if none are left and it is required.
-export function xmlLines(nodes, scope, root, depth = 0) {
+export function xmlLines(nodes, scope, root, depth = 0, prune = false) {
   const pad = '  '.repeat(depth), lines = [];
   for (const n of nodes) {
     let scopes = [scope];
@@ -111,11 +112,12 @@ export function xmlLines(nodes, scope, root, depth = 0) {
       const name = xmlName(fill(n.tag || '', sc, root));
       const attrs = (n.attrs || []).filter(a => a.name.trim()).map(a => ` ${a.name.trim()}="${fill(a.value, sc, root, escAttr, info)}"`).join('');
       const text = fill(n.text || '', sc, root, escText, info);
-      const kids = xmlLines(n.kids || [], sc, root, depth + 1);
+      const kids = xmlLines(n.kids || [], sc, root, depth + 1, prune);
       if (kids === null || (n.required && !info.hasValue && !kids.length)) {
         if (!repeats) return null;
         continue;
       }
+      if (prune && !info.hasValue && !kids.length) continue; // pruning: drop elements with nothing in them
       valid++;
       if (!kids.length) lines.push(text ? `${pad}<${name}${attrs}>${text}</${name}>` : `${pad}<${name}${attrs}/>`);
       else {

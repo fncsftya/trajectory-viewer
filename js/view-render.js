@@ -26,18 +26,18 @@ export function renderView(pair, v) {
   if (xml && cfg.wrap?.on) {
     // One combined document: every output becomes a child of the root element.
     const name = xmlName(cfg.wrap.tag || 'root');
-    const inner = recs.flatMap(rec => xmlLines(cfg.xml || [], rec, data, 1) || []);
+    const inner = recs.flatMap(rec => xmlLines(cfg.xml || [], rec, data, 1, !!cfg.pruneEmpty) || []);
     const text = inner.length ? [`<${name}>`, ...inner, `</${name}>`].join('\n') : `<${name}/>`;
     outs = { length: 1, at: () => text };
     v.allOuts = () => [text];
   } else if (xml && hasRequiredXml(cfg.xml || [])) {
     // Required elements can drop outputs, so the count isn't known until each one is built.
-    const built = recs.map(rec => xmlLines(cfg.xml || [], rec, data)?.join('\n')).filter(o => o !== undefined);
+    const built = recs.map(rec => xmlLines(cfg.xml || [], rec, data, 0, !!cfg.pruneEmpty)?.join('\n')).filter(o => o !== undefined);
     outs = { length: built.length, at: i => built[i] };
     v.allOuts = () => built;
   } else if (xml) {
     const cache = new Array(recs.length);
-    outs = { length: recs.length, at: i => cache[i] ??= xmlLines(cfg.xml || [], recs[i], data).join('\n') };
+    outs = { length: recs.length, at: i => cache[i] ??= xmlLines(cfg.xml || [], recs[i], data, 0, !!cfg.pruneEmpty).join('\n') };
     v.allOuts = () => recs.map((_, i) => outs.at(i));
   } else {
     const built = recs.map(rec => fill(cfg.template, rec, data));
