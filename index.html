@@ -1,0 +1,1647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSON Viewer</title>
+<style>
+  :root { --accent: #7aa2f7; --accent-bg: #e8effe; --muted: #777; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; color: #000; font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; display: flex; flex-direction: column; height: 100vh; }
+  nav { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid #000; align-items: center; }
+  nav button.tab { font: inherit; background: none; border: 1px solid transparent; border-bottom: none; padding: 6px 14px; cursor: pointer; color: var(--muted); }
+  nav button.tab { box-shadow: inset 0 3px 0 var(--accent); }
+  nav button.tab.active { color: #000; border-color: #000; background: #fff; margin-bottom: -1px; }
+  nav button.add { font: inherit; background: none; border: 1px solid transparent; padding: 6px 12px; cursor: pointer; color: var(--muted); }
+  nav button.add:hover { color: #000; background: var(--accent-bg); }
+  nav .spacer { flex: 1; }
+  nav button.tab { min-width: 110px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #settings { margin-right: 6px; }
+  dialog { border: 1px solid #000; padding: 16px 20px; min-width: 360px; max-width: 90vw; font: inherit; color: #000; background: #fff; }
+  dialog::backdrop { background: rgba(0,0,0,0.35); }
+  dialog h2 { margin: 0 0 12px; font-size: 1.1em; }
+  .pair-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .swatch { width: 18px; height: 18px; border: 1px solid #000; flex: none; background: var(--accent); }
+  .pair-row input { flex: 1; font: inherit; border: 1px solid #000; padding: 3px 8px; outline: none; }
+  .pair-row .del { margin: 0; padding: 2px 10px; }
+  .empty { margin: auto; color: var(--muted); text-align: center; }
+  .pair-row input:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .btn { font: inherit; background: var(--accent); color: #000; border: 1px solid #000; padding: 4px 14px; cursor: pointer; margin-bottom: 6px; }
+  .btn.plain { background: #fff; }
+  .btn:hover { filter: brightness(0.95); }
+  main { flex: 1; min-height: 0; display: flex; }
+  section { flex: 1; min-width: 0; display: none; padding: 12px; }
+  section.active { display: flex; flex-direction: column; }
+  textarea { flex: 1; width: 100%; resize: none; font: inherit; border: 1px solid #000; padding: 10px; outline: none; white-space: pre; }
+  textarea:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .out { overflow: auto; flex: 1; }
+  .tree { width: 60%; }
+  .out.full .tree { width: 100%; }
+  .err { border: 1px solid #000; background: var(--accent-bg); padding: 10px; white-space: pre-wrap; }
+  .tools { margin-bottom: 8px; display: flex; gap: 6px; }
+  .tools .btn { margin: 0; padding: 2px 10px; }
+  ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px dotted #bbb; }
+  .tree > ul { padding-left: 0; border: none; }
+  li { white-space: nowrap; }
+  /* Array items: alternating bands tinted from the pair colour. The shadow extends the band left to the edge of the view. */
+  li.alt0 { background: color-mix(in srgb, var(--accent) 13%, #fff); box-shadow: -100vw 0 0 color-mix(in srgb, var(--accent) 13%, #fff); }
+  li.alt1 { background: color-mix(in srgb, var(--accent) 3%, #fff); box-shadow: -100vw 0 0 color-mix(in srgb, var(--accent) 3%, #fff); }
+  li.node.collapsed.alt0, li.node.collapsed.alt1 { background: none; box-shadow: none; }
+  .tog { display: inline-block; width: 16px; cursor: pointer; user-select: none; color: color-mix(in srgb, var(--accent) 55%, #000); text-align: center; }
+  .row.fold { cursor: pointer; }
+  .row.fold:hover { background: color-mix(in srgb, var(--accent) 55%, #fff); box-shadow: -100vw 0 0 color-mix(in srgb, var(--accent) 55%, #fff); }
+  .key { color: #000; font-weight: bold; }
+  .str { color: #000; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .str.block { display: block; margin: 2px 0 4px 36px; padding-left: 8px; border-left: 2px solid var(--accent); }
+  .num, .lit { color: #000; }
+  .punc, .meta { color: var(--muted); }
+  .preview { color: var(--muted); font-style: italic; }
+  .collapsed > ul, .collapsed > .close { display: none; }
+  .node:not(.collapsed) > .row .preview, .node:not(.collapsed) > .row .end { display: none; }
+  .collapsed > .row .open-only { display: none; }
+  [hidden] { display: none !important; }
+  mark { background: var(--accent-bg); }
+  .strbox { margin: 2px 0 4px 36px; }
+  .strtabs { display: flex; gap: 2px; margin-bottom: 2px; }
+  .strtabs button { font: inherit; font-size: 12px; background: none; border: 1px solid transparent; padding: 0 8px; cursor: pointer; color: var(--muted); }
+  .strtabs button.active { color: #000; border-color: #000; box-shadow: inset 0 2px 0 var(--accent); }
+  .strbox .str.block { margin: 0; }
+  .md { font-family: system-ui, sans-serif; white-space: normal; overflow-wrap: anywhere; padding-left: 8px; border-left: 2px solid var(--accent); }
+  .md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+  .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 0.8em 0 0.3em; line-height: 1.25; }
+  .md h1 { font-size: 1.5em; } .md h2 { font-size: 1.3em; } .md h3 { font-size: 1.15em; } .md h4, .md h5, .md h6 { font-size: 1em; }
+  .md p { margin: 0.5em 0; }
+  .md ul, .md ol { list-style: revert; border: none; padding-left: 24px; margin: 0.3em 0; }
+  .md li { white-space: normal; }
+  .md code { font-family: inherit; background: var(--accent-bg); padding: 0 3px; }
+  .md pre { background: var(--accent-bg); padding: 8px; overflow: auto; margin: 0.5em 0; }
+  .md pre code { background: none; padding: 0; white-space: pre; }
+  .md blockquote { margin: 0.5em 0; padding-left: 10px; border-left: 3px solid #bbb; color: var(--muted); }
+  .md hr { border: none; border-top: 1px solid #bbb; }
+  .md a { color: #2a4fb5; }
+  .md table { border-collapse: collapse; margin: 0.5em 0; }
+  .md th, .md td { border: 1px solid #000; padding: 2px 8px; }
+  .btn.blue { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+  .viewbody { overflow: auto; flex: 1; }
+  .view-item { border: 1px solid #000; padding: 8px 10px; margin-bottom: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .view-item.min .view-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .item-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dotted #bbb; }
+  .item-bar .btn { margin: 0; padding: 0 8px; font-size: 12px; }
+  .item-tags { display: contents; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent); border: 1px solid #000; padding: 0 4px 0 8px; font-size: 12px; white-space: normal; }
+  .chip-x { font: inherit; background: none; border: none; cursor: pointer; padding: 0 2px; line-height: 1; }
+  .tag-input { font: inherit; font-size: 12px; border: 1px solid #000; padding: 0 6px; outline: none; width: 140px; }
+  .tag-input:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .view-count { margin-bottom: 8px; }
+  #view-modal { width: min(1200px, 94vw); height: 88vh; padding: 0; }
+  #view-modal[open] { display: flex; flex-direction: column; }
+  #view-modal header, #view-modal footer { padding: 12px 20px; display: flex; gap: 8px; align-items: center; }
+  #view-modal header { border-bottom: 1px solid #000; }
+  #view-modal header h2 { margin: 0; flex: 1; }
+  #view-modal footer { border-top: 1px solid #000; justify-content: flex-end; }
+  #view-modal .cols { flex: 1; min-height: 0; display: flex; }
+  #view-modal .col { flex: 1; min-width: 0; padding: 14px 20px; display: flex; flex-direction: column; overflow: auto; }
+  #view-modal .col + .col { border-left: 1px solid #000; }
+  #view-modal h3 { margin: 0 0 8px; font-size: 1em; }
+  #view-modal .col > .meta { margin-bottom: 10px; }
+  .mtabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .mtab { font: inherit; background: #fff; border: 1px solid #000; padding: 2px 14px; cursor: pointer; color: var(--muted); }
+  .mtab.active { background: var(--accent); color: #000; }
+  .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pane[hidden] { display: none; }
+  #vc-pane-xml { overflow: auto; min-height: 200px; border: 1px solid #bbb; padding: 8px; margin-bottom: 8px; }
+  #vc-pane-xml > div { flex: none; }
+  #vc-xml { margin-bottom: 8px; }
+  .xn { border-left: 2px solid var(--accent); padding: 4px 0 4px 8px; margin: 4px 0; }
+  .xn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 4px; }
+  .xn input { font: inherit; font-size: 12px; border: 1px solid #000; padding: 1px 6px; outline: none; min-width: 0; }
+  .xn input:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .xn-warn { font-size: 12px; background: #fff4d6; border: 1px solid #c9a227; padding: 2px 8px; margin-bottom: 4px; white-space: normal; }
+  .xn-warn[hidden] { display: none; }
+  .xn .lbl { font-size: 12px; color: var(--muted); }
+  .xn .btn { margin: 0; padding: 0 8px; font-size: 12px; }
+  .xn .f-tag { width: 110px; } .xn .f-each { width: 170px; } .xn .f-as { width: 70px; } .xn .f-text { flex: 1; min-width: 160px; }
+  .xn .f-an { width: 90px; } .xn .f-av { width: 140px; }
+  #ac { position: fixed; z-index: 10; background: #fff; border: 1px solid #000; max-height: 220px; overflow: auto; min-width: 160px; font-size: 12px; }
+  #ac div { padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+  #ac div.on { background: var(--accent); }
+  #ac small { color: var(--muted); margin-left: 10px; }
+  li.more { margin: 2px 0; }
+  li.more .btn { margin: 0; padding: 0 8px; font-size: 12px; }
+  .item-bar .strtabs { margin: 0; }
+  .item-bar .strtabs button { font-size: 12px; padding: 0 8px; }
+  .xtree { white-space: normal; overflow: auto; }
+  .xtree > ul { padding-left: 0; border: none; }
+  .xtree .preview { margin-left: 8px; }
+  .pv { margin-top: 12px; border: 1px solid #000; background: var(--accent-bg); padding: 8px 10px; font-size: 12px; white-space: normal; }
+  .pv h4 { margin: 0 0 4px; font-size: 1em; }
+  .pv .sel { margin-top: 6px; padding-top: 4px; border-top: 1px dotted #999; }
+  .pv .val { color: var(--muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .pp { display: flex; gap: 10px; }
+  .pp label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  textarea.mini { flex: none; height: 64px; white-space: pre-wrap; }
+  #vc-tpl { white-space: pre-wrap; min-height: 200px; }
+  .sel-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dotted #bbb; }
+  .sel-row select { font: inherit; border: 1px solid #000; background: #fff; padding: 3px 6px; max-width: 100%; }
+  .sel-row .tag { font: inherit; border: 1px solid #000; background: var(--accent-bg); padding: 2px 8px; cursor: pointer; }
+  .sel-row .tag:hover { background: var(--accent); }
+  .sel-row .del { margin: 0; padding: 2px 10px; }
+  .sel-row .req { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .sel-row .tag small { color: var(--muted); }
+  .sel-row .foot { display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+<nav>
+  <button class="add" id="add" title="New input/output pair">+</button>
+  <span class="spacer"></span>
+  <button class="btn plain" id="settings">Settings</button>
+</nav>
+<main><div class="empty" id="empty" hidden>No tabs yet. Click + to add an input/output pair.</div></main>
+<dialog id="settings-modal">
+  <h2>Settings</h2>
+  <div id="pair-list"></div>
+</dialog>
+<dialog id="view-modal">
+  <header><h2>Configure view</h2></header>
+  <div class="cols">
+    <div class="col">
+      <h3>1. Loop over</h3>
+      <div class="meta">Pick the array to loop over: you get one output per item, and inside it the current item is <code>$item</code>. Leave it on the whole document for a single output.</div>
+      <div id="vc-loop"></div>
+      <label class="meta" style="display:block;margin-bottom:8px">Name for the item <input id="vc-as" value="item" style="font:inherit;font-size:12px;border:1px solid #000;padding:1px 6px;width:100px"></label>
+      <h3 style="margin-top:8px">Only include items where…</h3>
+      <div class="meta">These fields must not be empty (missing, blank, <code>[]</code> or <code>{}</code> all count as empty).</div>
+      <div id="vc-filters"></div>
+      <div><button class="btn plain" id="vc-add">+ Add condition</button></div>
+      <div id="vc-preview" class="pv"></div>
+    </div>
+    <div class="col">
+      <h3>2. Transform</h3>
+      <div class="meta">Output is built once per item. Use <code>$item</code> and <code>$item__field</code> (click a tag on the left to insert it). Any path from the document root also works anywhere, e.g. <code>$steps__step_id</code>; through an array it gives all the values.</div>
+      <div class="mtabs"><button class="mtab" data-mode="text">Text</button><button class="mtab" data-mode="xml">XML</button></div>
+      <div class="pane" id="vc-pane-text">
+        <textarea id="vc-tpl" spellcheck="false" placeholder="e.g. Step: $item__message"></textarea>
+      </div>
+      <div class="pane" id="vc-pane-xml" hidden>
+        <div class="meta">Build the output as XML elements. Set <b>repeat</b> to an array (e.g. <code>$item__tool_calls</code>) to emit the element once per entry, named by <b>as</b> (default <code>child</code>); children can use <code>$child</code> and <code>$child__field</code>. Repeating over an object gives one entry per key: <code>$child</code> is the key and <code>$child__value</code> its value (or repeat over <code>$obj__items</code>). Tag names, text and attributes may contain <code>$refs</code>.</div>
+        <div class="xn-row" id="vc-wrap-row">
+          <label class="req"><input type="checkbox" id="vc-wrap"> Wrap all outputs in one root element</label>
+          <input id="vc-wrap-tag" placeholder="root" style="font:inherit;font-size:12px;border:1px solid #000;padding:1px 6px;width:120px">
+        </div>
+        <div id="vc-xml"></div>
+        <div><button class="btn plain" id="vc-xml-add">+ Add element</button></div>
+      </div>
+      <div id="vc-export">
+      <h3 style="margin-top:12px">Export (optional)</h3>
+      <div class="meta">When there is more than one result, Export puts the header on its own line before all results and the footer on its own line after them.</div>
+      <div class="pp">
+        <label>Header<textarea class="mini" id="vc-header" spellcheck="false"></textarea></label>
+        <label>Footer<textarea class="mini" id="vc-footer" spellcheck="false"></textarea></label>
+      </div>
+      </div>
+    </div>
+  </div>
+  <textarea id="vc-diag" class="mini" readonly hidden spellcheck="false" style="flex:none;margin:0 20px 8px;width:auto"></textarea>
+  <footer>
+    <span class="meta" id="vc-err" style="margin-right:auto"></span>
+    <button class="btn plain" id="vc-diag-btn" title="Copy a diagnostic report (config, trimmed sample data, sample outputs) to send for debugging">Copy diagnostics</button>
+    <button class="btn plain" id="vc-cancel">Cancel</button>
+    <button class="btn blue" id="vc-save">Save</button>
+  </footer>
+</dialog>
+<dialog id="export-modal">
+  <h2>Export XML</h2>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label class="meta" for="ex-pre" style="margin-right:auto">Preamble (optional), copied before the XML</label>
+    <button class="btn plain" id="ex-pre-load" title="Replace the preamble with the contents of a text file">Load…</button>
+    <button class="btn plain" id="ex-pre-save" title="Save the preamble to a text file">Save…</button>
+    <input type="file" id="ex-pre-file" accept=".txt,.md,text/plain,text/markdown" hidden>
+  </div>
+  <textarea id="ex-pre" class="mini" spellcheck="false" style="width:min(560px,80vw);height:120px;margin:4px 0 10px"></textarea>
+  <div class="meta" id="ex-info"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <span class="meta" id="ex-err" style="margin-right:auto"></span>
+    <button class="btn plain" id="ex-cancel">Cancel</button>
+    <button class="btn plain" id="ex-dl" title="Save the export as a text file, for content too large to paste">Download .txt</button>
+    <button class="btn blue" id="ex-go">Copy</button>
+  </div>
+</dialog>
+<template id="pair-tpl">
+  <section class="in">
+    <div class="tools">
+      <button class="btn blue view">View</button>
+    </div>
+    <textarea spellcheck="false" placeholder="Paste JSON here…"></textarea>
+  </section>
+  <section class="outsec">
+    <div class="tools">
+      <button class="btn blue create-view" title="Create a view of this output">Create View</button>
+      <button class="btn plain expand">Expand all</button>
+      <button class="btn plain collapse">Collapse all</button>
+      <button class="btn plain width" title="Toggle output width">Width: 60%</button>
+    </div>
+    <div class="out"><div class="tree"></div></div>
+  </section>
+</template>
+<script>
+const $ = s => document.querySelector(s);
+const MAX_PREVIEW = 80;
+const LONG_STRING = 80;
+const CHUNK = 200; // tree children built per step
+
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+};
+
+const isContainer = v => v !== null && typeof v === 'object';
+
+// One-line summary of a value for use inside a fold preview.
+function brief(v) {
+  if (Array.isArray(v)) return v.length ? '[…]' : '[]';
+  if (isContainer(v)) return Object.keys(v).length ? '{…}' : '{}';
+  return JSON.stringify(v);
+}
+
+function preview(v) {
+  const isArr = Array.isArray(v);
+  const parts = [];
+  let len = 0, more = false;
+  const keys = Object.keys(v), count = keys.length;
+  for (const k of keys) {
+    const x = v[k];
+    let s = (isArr ? '' : JSON.stringify(k) + ': ') + brief(x);
+    if (s.length > 30) s = s.slice(0, 29) + '…';
+    if (len + s.length > MAX_PREVIEW) { more = true; break; }
+    parts.push(s);
+    len += s.length + 2;
+  }
+  const body = parts.join(', ') + (more ? ', …' : '');
+  return (isArr ? '[' : '{') + (body ? ' ' + body + ' ' : '') + (isArr ? ']' : '}')
+    + '  ' + count + (isArr ? ' item' : ' key') + (count === 1 ? '' : 's');
+}
+
+// JSON-escaped string body, but with \n shown as real line breaks and \r dropped.
+function multiline(s) {
+  return JSON.stringify(s).slice(1, -1).replace(/\\\\|\\n|\\r/g, m => m === '\\n' ? '\n' : m === '\\r' ? '' : m);
+}
+
+// ---- Minimal markdown support ----
+const MD_THRESHOLD = 3;
+const MD_SIGNS = [
+  /\[[^\]\n]+\]\([^)\s]+\)/g,          // links
+  /\*\*[^*\n]+\*\*|__[^_\n]+__/g,      // bold
+  /(?<![\w*])\*[^*\s][^*\n]*\*(?![\w*])/g, // italic
+  /`[^`\n]+`/g,                        // inline code
+  /^```/gm,                            // code fence
+  /^#{1,6} +\S/gm,                     // headings
+  /^ *[-*+] +\S/gm,                    // bullets
+  /^ *\d+[.)] +\S/gm,                  // numbered
+  /^> +\S/gm,                          // blockquote
+  /^\|.+\|\s*$/gm,                     // table rows
+];
+const mdScore = s => MD_SIGNS.reduce((n, re) => n + (s.match(re) || []).length, 0);
+
+const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function mdInline(src) {
+  const codes = [];
+  let t = escHtml(src).replace(/`([^`\n]+)`/g, (_, c) => '\u0000' + (codes.push(c) - 1) + '\u0000');
+  t = t.replace(/!?\[([^\]\n]+)\]\(([^)\s]+)(?:\s+&quot;[^)]*&quot;)?\)/g, (m, text, url) => {
+    const u = url.replace(/&amp;/g, '&');
+    return /^(https?:|file:|mailto:|#|\/)/i.test(u)
+      ? '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + text + '</a>' : m;
+  });
+  t = t.replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_, a, b) => '<strong>' + (a || b) + '</strong>')
+       .replace(/(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])/g, '<em>$1</em>')
+       .replace(/(?<!\w)_([^_\s][^_]*?)_(?!\w)/g, '<em>$1</em>')
+       .replace(/~~(.+?)~~/g, '<del>$1</del>');
+  return t.replace(/\u0000(\d+)\u0000/g, (_, i) => '<code>' + codes[i] + '</code>');
+}
+
+function renderMarkdown(src) {
+  const lines = src.replace(/\r\n?/g, '\n').split('\n');
+  const out = [];
+  const isBlockStart = l => /^(```|#{1,6} |> |\s*([-*+]|\d+[.)]) +\S|\s*([-*_] *){3,}$)/.test(l);
+  const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+  let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    let m;
+    if (!l.trim()) { i++; continue; }
+    if (/^```/.test(l)) {
+      const buf = [];
+      for (i++; i < lines.length && !/^```/.test(lines[i]); i++) buf.push(lines[i]);
+      i++;
+      out.push('<pre><code>' + escHtml(buf.join('\n')) + '</code></pre>');
+    } else if ((m = /^(#{1,6}) +(.*?)#* *$/.exec(l))) {
+      out.push('<h' + m[1].length + '>' + mdInline(m[2]) + '</h' + m[1].length + '>'); i++;
+    } else if (/^\s*([-*_] *){3,}$/.test(l)) {
+      out.push('<hr>'); i++;
+    } else if (/^> ?/.test(l)) {
+      const buf = [];
+      for (; i < lines.length && /^> ?/.test(lines[i]); i++) buf.push(lines[i].replace(/^> ?/, ''));
+      out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+    } else if (/^\s*([-*+]|\d+[.)]) +\S/.test(l)) {
+      const stack = []; // {indent, tag}
+      let html = '';
+      for (; i < lines.length; i++) {
+        const lm = /^(\s*)([-*+]|\d+[.)]) +(.*)$/.exec(lines[i]);
+        if (!lm) break;
+        const indent = lm[1].replace(/\t/g, '    ').length, tag = /\d/.test(lm[2]) ? 'ol' : 'ul';
+        while (stack.length && indent < stack[stack.length - 1].indent) html += '</li></' + stack.pop().tag + '>';
+        if (stack.length && indent === stack[stack.length - 1].indent) html += '</li>';
+        else if (!stack.length || indent > stack[stack.length - 1].indent) { stack.push({ indent, tag }); html += '<' + tag + '>'; }
+        html += '<li>' + mdInline(lm[3]);
+      }
+      while (stack.length) html += '</li></' + stack.pop().tag + '>';
+      out.push(html);
+    } else if (/^\|.*\|\s*$/.test(l) && /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(lines[i + 1] || '')) {
+      const head = cells(l);
+      let html = '<table><thead><tr>' + head.map(c => '<th>' + mdInline(c) + '</th>').join('') + '</tr></thead><tbody>';
+      for (i += 2; i < lines.length && /^\|.*\|\s*$/.test(lines[i]); i++)
+        html += '<tr>' + cells(lines[i]).map(c => '<td>' + mdInline(c) + '</td>').join('') + '</tr>';
+      out.push(html + '</tbody></table>');
+    } else {
+      const buf = [];
+      for (; i < lines.length && lines[i].trim() && (!buf.length || !isBlockStart(lines[i])); i++) buf.push(lines[i]);
+      out.push('<p>' + buf.map(mdInline).join('<br>') + '</p>');
+    }
+  }
+  return out.join('');
+}
+
+// Long/multiline string: tabbed Raw / Markdown view, defaulting by markdown detection.
+function stringBlock(v, comma, shown) {
+  const box = el('div', 'strbox');
+  const raw = el('div', 'str block', shown ?? '"' + multiline(v) + '"');
+  raw.append(el('span', 'punc', comma));
+  const md = el('div', 'md');
+  let rendered = false;
+  const tabs = el('div', 'strtabs');
+  const btns = {};
+  const pick = mode => {
+    for (const k in btns) btns[k].classList.toggle('active', k === mode);
+    raw.hidden = mode !== 'raw';
+    md.hidden = mode !== 'markdown';
+    if (mode === 'markdown' && !rendered) { rendered = true; md.innerHTML = renderMarkdown(v); }
+  };
+  for (const [k, label] of [['raw', 'Raw'], ['markdown', 'Markdown']]) {
+    btns[k] = el('button', '', label);
+    btns[k].onclick = e => { e.stopPropagation(); pick(k); };
+    tabs.append(btns[k]);
+  }
+  box.append(tabs, raw, md);
+  pick(mdScore(v) >= MD_THRESHOLD ? 'markdown' : 'raw');
+  return box;
+}
+
+function primitive(v) {
+  const cls = typeof v === 'string' ? 'str' : (typeof v === 'number' ? 'num' : 'lit');
+  return el('span', cls, JSON.stringify(v));
+}
+
+function build(v, key, isLast, alt) {
+  const li = el('li', alt === undefined ? '' : 'alt' + alt);
+  const row = el('div', 'row');
+  const comma = isLast ? '' : ',';
+  const addKey = () => {
+    if (key !== null) {
+      row.append(el('span', 'key', JSON.stringify(key)), el('span', 'punc', ': '));
+    }
+  };
+
+  if (!isContainer(v) || (Array.isArray(v) ? v.length === 0 : Object.keys(v).length === 0)) {
+    row.append(el('span', 'tog', ''));
+    addKey();
+    if (typeof v === 'string' && (v.length > LONG_STRING || v.includes('\n'))) {
+      li.append(row);
+      li.append(stringBlock(v, comma));
+      return li;
+    }
+    row.append(isContainer(v) ? el('span', 'punc', Array.isArray(v) ? '[]' : '{}') : primitive(v));
+    row.append(el('span', 'punc', comma));
+    li.append(row);
+    return li;
+  }
+
+  const isArr = Array.isArray(v);
+  li.classList.add('node', 'collapsed');
+  row.classList.add('fold');
+  const tog = el('span', 'tog', '▸');
+  row.append(tog);
+  addKey();
+  row.append(el('span', 'punc open-only', isArr ? '[' : '{'));
+  row.append(el('span', 'preview', preview(v)));
+  row.append(el('span', 'punc end', comma));
+  li.append(row);
+
+  let built = false;
+  // Shift-click expanding also opens direct children (one level only); children opened this way don't cascade.
+  const toggle = (openChildren = false) => {
+    if (!built) {
+      built = true;
+      const ul = el('ul');
+      const keys = Object.keys(v), total = keys.length;
+      // Children are added CHUNK at a time so a huge array/object doesn't build thousands of nodes at once.
+      const addRange = from => {
+        const to = Math.min(total, from + CHUNK);
+        for (let i = from; i < to; i++) ul.append(build(v[keys[i]], isArr ? null : keys[i], i === total - 1, isArr ? i % 2 : undefined));
+        if (to < total) {
+          const more = el('li', 'more');
+          const b = el('button', 'btn plain', `Show ${Math.min(CHUNK, total - to)} more (${total - to} remaining)`);
+          b.onclick = e => { e.stopPropagation(); more.remove(); addRange(to); };
+          more.append(b);
+          ul.append(more);
+        }
+      };
+      addRange(0);
+      li.append(ul);
+      const close = el('div', 'close');
+      close.append(el('span', 'tog', ''), el('span', 'punc', (isArr ? ']' : '}') + comma));
+      li.append(close);
+    }
+    li.classList.toggle('collapsed');
+    const collapsed = li.classList.contains('collapsed');
+    tog.textContent = collapsed ? '▸' : '▾';
+    if (!collapsed && (openChildren || (isArr && v.length === 1)))
+      for (const c of li.querySelectorAll(':scope > ul > li.node.collapsed')) c.toggle();
+  };
+  li.toggle = toggle;
+  row.onclick = e => toggle(e.shiftKey);
+  return li;
+}
+
+function setAll(tree, open) {
+  // Expand lazily-built nodes level by level, capped to avoid freezing on huge docs.
+  let budget = 20000;
+  const walk = root => {
+    for (const li of root.querySelectorAll(':scope > ul > li.node, :scope > li.node')) {
+      const isOpen = !li.classList.contains('collapsed');
+      if (open && !isOpen && budget-- > 0) li.toggle();
+      if (!open && isOpen) li.toggle();
+      walk(li);
+    }
+  };
+  walk(tree.querySelector(':scope > ul') || tree);
+}
+
+// Outputs are rendered lazily: render() only marks them stale, and ensure() builds one when its tab is shown.
+function render(pair) {
+  pair.treeDirty = true;
+  pair.views.forEach(v => { v.dirty = true; });
+  if (current && current.pair === pair) ensure(pair, current.kind);
+}
+
+// Show a placeholder straight away and do the heavy work on the next tick, so the page can paint first.
+function ensure(pair, kind) {
+  if (kind === 'out' && pair.treeDirty) {
+    pair.treeDirty = false;
+    pair.tree.replaceChildren(el('div', 'meta', 'Loading…'));
+    setTimeout(() => renderTree(pair), 20);
+  } else if (typeof kind === 'object' && kind.dirty) {
+    kind.dirty = false;
+    kind.body.replaceChildren(el('div', 'meta', 'Loading…'));
+    setTimeout(() => renderView(pair, kind), 20);
+  }
+}
+
+function renderTree(pair) {
+  const tree = pair.tree;
+  tree.replaceChildren();
+  const text = pair.src.value.trim();
+  if (!text) { tree.append(el('div', 'err', 'Nothing to show. Paste some JSON on the Input tab.')); return; }
+  let data;
+  try { data = JSON.parse(text); }
+  catch (e) { tree.append(el('div', 'err', 'Invalid JSON: ' + e.message)); return; }
+  const ul = el('ul');
+  const root = build(data, null, true);
+  ul.append(root);
+  tree.append(ul);
+  if (root.toggle) root.toggle(); // open the root
+}
+
+// ---- Persistence (localStorage) ----
+const STORE_KEY = 'json-viewer-state';
+let restoring = false, saveTimer = null;
+
+function saveNow() {
+  clearTimeout(saveTimer);
+  if (restoring) return;
+  const state = {
+    pairs: pairs.map(p => ({
+      hue: p.hue, num: p.num, name: p.name, text: p.src.value,
+      full: p.out.classList.contains('full'),
+      views: p.views.map(v => ({ num: v.num, config: v.config, state: v.state, preamble: v.preamble })),
+    })),
+    current: current && {
+      pair: pairs.indexOf(current.pair),
+      kind: typeof current.kind === 'string' ? current.kind : current.kind.num,
+    },
+  };
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
+}
+const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 250); };
+addEventListener('pagehide', saveNow);
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return null; }
+}
+
+function restore(state) {
+  restoring = true;
+  for (const sp of state.pairs) {
+    const pair = addPair(sp);
+    for (const sv of sp.views || []) addView(pair, sv);
+  }
+  restoring = false;
+  $('#empty').hidden = pairs.length > 0;
+  const c = state.current, pair = c && pairs[c.pair];
+  if (pair) show(pair, c.kind === 'in' || c.kind === 'out' ? c.kind : pair.views.find(v => v.num === c.kind) || 'out');
+  else if (pairs.length) show(pairs[0], 'in');
+  saveNow();
+}
+
+// ---- Views: select data -> transform ----
+const newSchema = () => ({ kids: {}, types: new Set(), array: false });
+
+// Merged schema of a value; arrays are transparent (their elements' shape is merged into one node).
+function buildSchema(v, node = newSchema()) {
+  if (Array.isArray(v)) { node.array = true; v.forEach(x => buildSchema(x, node)); }
+  else if (isContainer(v)) {
+    node.types.add('object');
+    for (const [k, x] of Object.entries(v)) buildSchema(x, node.kids[k] ||= newSchema());
+  } else node.types.add(v === null ? 'null' : typeof v);
+  return node;
+}
+
+function describe(node) {
+  if (node.types.has('entry')) return 'key/value entry';
+  const t = [...node.types].join('|');
+  return node.array ? '[ ] ' + (t || 'empty') : t;
+}
+
+const slug = k => String(k).replace(/[^A-Za-z0-9_]/g, '_');
+
+// One key/value pair of an object, produced by repeating over an object. Prints as its key; `__value` and `__key` pick the parts.
+class Entry { constructor(key, value) { this.key = key; this.value = value; } }
+const entriesOf = o => Object.entries(o).map(([k, x]) => new Entry(k, x));
+
+function fmt(v) {
+  if (v === undefined) return '';
+  if (v instanceof Entry) return v.key;
+  return typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+}
+
+const missing = v => v === undefined || v === null;
+// "Required" means present with content: not null/undefined, a blank string, an empty array/object, or an array of only such values.
+const isEmptyVal = v => missing(v) || (typeof v === 'string' && !v.trim())
+  || (Array.isArray(v) ? v.every(isEmptyVal) : isContainer(v) && !(v instanceof Entry) && !Object.keys(v).length);
+
+// Child lookup that maps over arrays, so a path through an array yields an array of values.
+const pick = (v, k) => Array.isArray(v) ? v.map(x => pick(x, k)) : isContainer(v) ? v[k] : undefined;
+const step = (v, tok) => {
+  if (Array.isArray(v)) return v.map(x => step(x, tok));
+  if (v instanceof Entry) return tok === 'key' ? v.key : tok === 'value' ? v.value : undefined;
+  if (!isContainer(v)) return undefined;
+  const k = Object.keys(v).find(k => slug(k) === tok);
+  if (k === undefined) return tok === 'items' ? entriesOf(v) : undefined; // `items` of an object: its entries
+  return v[k];
+};
+const dive = (v, toks) => toks.reduce(step, v);
+
+// Resolve `name__sub__path` (no $). A scope entry (match id or loop variable) wins; otherwise it's a path from the document root.
+let globalCache = new Map();
+function lookup(ref, scope, root) {
+  const [head, ...rest] = ref.split('__');
+  if (Object.hasOwn(scope, head)) return { found: true, value: dive(scope[head], rest) };
+  if (/^match\d+$/.test(head)) return { found: true, value: undefined }; // a selection with nothing for this output
+  // Global (document-root) references are the same for every output, so resolve and format each once per render.
+  if (globalCache.has(ref)) return globalCache.get(ref);
+  const has = x => Array.isArray(x) ? x.some(has) : isContainer(x) && Object.keys(x).some(k => slug(k) === head);
+  const r = has(root) ? { found: true, value: dive(root, [head, ...rest]) } : { found: false };
+  if (r.found) r.text = fmt(r.value);
+  globalCache.set(ref, r);
+  return r;
+}
+
+// Replace $refs; ones that resolve to nothing known are left as typed.
+// `info.hasValue` is set when the result has literal text or a reference that resolved to something non-empty.
+function fill(tpl, scope, root, esc = s => s, info = null) {
+  return tpl.split(/(\$[A-Za-z_][A-Za-z0-9_]*)/).map((part, i) => {
+    if (i % 2) {
+      const r = lookup(part.slice(1), scope, root);
+      if (r.found) { if (info && !isEmptyVal(r.value)) info.hasValue = true; return esc(r.text ?? fmt(r.value)); }
+    }
+    if (info && part.trim()) info.hasValue = true;
+    return esc(part);
+  }).join('');
+}
+
+// ---- Loop: one output per item of the chosen array ----
+const flatDeep = v => Array.isArray(v) ? v.flatMap(flatDeep) : [v];
+const valueAt = (v, path) => path.reduce((acc, k) => pick(acc, k), v);
+// The items to loop over: elements of the array at `path` (arrays along the way are flattened); no path = the document itself.
+const loopItems = (data, path) => flatDeep(valueAt(data, path)).filter(x => !missing(x));
+// Conditions: every listed field (a path inside the item) must be non-empty.
+const passes = (item, filters) => filters.every(p => !isEmptyVal(valueAt(item, p)));
+
+// XML mode: nodes are { tag, each, as, attrs: [{name, value}], text, kids }. `each` repeats the element per array item.
+const escText = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escAttr = s => escText(s).replace(/"/g, '&quot;');
+
+// One output for a scope, or null if a required XML element is empty.
+const outputOf = (cfg, scope, root) => cfg.mode === 'xml' ? (xmlLines(cfg.xml || [], scope, root)?.join('\n') ?? null) : fill(cfg.template || '', scope, root);
+
+const hasRequiredXml = nodes => nodes.some(n => n.required || hasRequiredXml(n.kids || []));
+
+// Make a string usable as an XML element name.
+function xmlName(s) {
+  let name = s.trim().replace(/[^A-Za-z0-9_.:-]/g, '_');
+  if (/^[^A-Za-z_]/.test(name)) name = '_' + name;
+  return name || 'item';
+}
+
+// Returns the lines, or null when a required element can't be filled (the whole output is then dropped).
+// An element marked `required` needs content: text, an attribute or children that resolved to something non-empty.
+// A repeated element just skips instances that fail; it only fails the output if none are left and it is required.
+function xmlLines(nodes, scope, root, depth = 0) {
+  const pad = '  '.repeat(depth), lines = [];
+  for (const n of nodes) {
+    let scopes = [scope];
+    const repeats = !!(n.each || '').trim();
+    if (repeats) {
+      const r = lookup(n.each.trim().replace(/^\$/, ''), scope, root);
+      const v = r.found ? r.value : undefined;
+      const as = (n.as || '').trim() || 'child';
+      const list = missing(v) ? [] : Array.isArray(v) ? v : isContainer(v) && !(v instanceof Entry) ? entriesOf(v) : [v];
+      scopes = list.map(x => ({ ...scope, [as]: x }));
+    }
+    let valid = 0;
+    for (const sc of scopes) {
+      const info = { hasValue: false };
+      const name = xmlName(fill(n.tag || '', sc, root));
+      const attrs = (n.attrs || []).filter(a => a.name.trim()).map(a => ` ${a.name.trim()}="${fill(a.value, sc, root, escAttr, info)}"`).join('');
+      const text = fill(n.text || '', sc, root, escText, info);
+      const kids = xmlLines(n.kids || [], sc, root, depth + 1);
+      if (kids === null || (n.required && !info.hasValue && !kids.length)) {
+        if (!repeats) return null;
+        continue;
+      }
+      valid++;
+      if (!kids.length) lines.push(text ? `${pad}<${name}${attrs}>${text}</${name}>` : `${pad}<${name}${attrs}/>`);
+      else {
+        lines.push(`${pad}<${name}${attrs}>`);
+        if (text) lines.push(pad + '  ' + text);
+        lines.push(...kids, `${pad}</${name}>`);
+      }
+    }
+    if (n.required && !valid) return null;
+  }
+  return lines;
+}
+
+// ---- XML preview: the same foldable tree as the JSON output, built from parsed XML ----
+const XEL = 1, XTEXT = 3, XCDATA = 4, XCOMMENT = 8;
+// Child nodes worth showing: elements, comments and non-blank text.
+const xKids = e => [...e.childNodes].filter(n => n.nodeType === XEL || n.nodeType === XCOMMENT || ((n.nodeType === XTEXT || n.nodeType === XCDATA) && n.nodeValue.trim()));
+const xIsText = n => n.nodeType === XTEXT || n.nodeType === XCDATA;
+
+// Outputs can hold several top-level elements, so they are parsed inside a synthetic root.
+function parseXml(text) {
+  const doc = new DOMParser().parseFromString('<x-root>' + text + '</x-root>', 'application/xml');
+  const bad = doc.getElementsByTagName('parsererror')[0];
+  if (bad) {
+    const msg = bad.textContent;
+    throw new Error((msg.match(/error on line[^\n]*?(?=Below|\n|$)/) || [msg.slice(0, 200)])[0].trim());
+  }
+  return doc.documentElement;
+}
+
+function xmlTag(e, selfClose) {
+  const parts = [el('span', 'punc', '<'), el('span', 'key', e.nodeName)];
+  for (const a of e.attributes) parts.push(el('span', 'meta', ' ' + a.name + '='), el('span', 'str', '"' + a.value + '"'));
+  parts.push(el('span', 'punc', selfClose ? '/>' : '>'));
+  return parts;
+}
+
+function xmlBrief(n) {
+  if (n.nodeType === XCOMMENT) return '<!-- -->';
+  if (xIsText(n)) return JSON.stringify(n.nodeValue.trim());
+  const k = xKids(n);
+  if (!k.length) return '<' + n.nodeName + '/>';
+  if (k.every(xIsText)) return n.nodeName + ': ' + JSON.stringify(n.textContent.trim().replace(/\s+/g, ' '));
+  return '<' + n.nodeName + '>…';
+}
+
+// Empty elements (`<reasoning/>`) are left out of the list and only counted, so the list shows what actually has content.
+const xIsEmpty = n => n.nodeType === XEL && !xKids(n).length;
+
+function xmlPreview(kids) {
+  const parts = [];
+  const full = kids.filter(n => !xIsEmpty(n)), empty = kids.length - full.length;
+  let len = 0, more = false;
+  for (const n of full) {
+    let s = xmlBrief(n);
+    if (s.length > 30) s = s.slice(0, 29) + '…';
+    if (len + s.length > MAX_PREVIEW) { more = true; break; }
+    parts.push(s);
+    len += s.length + 2;
+  }
+  return parts.join(', ') + (more ? ', …' : '') + '  ' + kids.length + (kids.length === 1 ? ' node' : ' nodes') + (empty ? ` (${empty} empty)` : '');
+}
+
+// Repeated sibling elements are banded like array items.
+function xmlAlts(kids) {
+  const count = {}, seen = {};
+  for (const n of kids) if (n.nodeType === XEL) count[n.nodeName] = (count[n.nodeName] || 0) + 1;
+  return kids.map(n => n.nodeType === XEL && count[n.nodeName] > 1 ? (seen[n.nodeName] = (seen[n.nodeName] || 0) + 1) % 2 : undefined);
+}
+
+// Children are added CHUNK at a time so a huge element doesn't build thousands of nodes at once.
+function xmlFill(ul, kids) {
+  const alts = xmlAlts(kids), total = kids.length;
+  const addRange = from => {
+    const to = Math.min(total, from + CHUNK);
+    for (let i = from; i < to; i++) ul.append(buildXml(kids[i], alts[i]));
+    if (to < total) {
+      const more = el('li', 'more');
+      const b = el('button', 'btn plain', `Show ${Math.min(CHUNK, total - to)} more (${total - to} remaining)`);
+      b.onclick = e => { e.stopPropagation(); more.remove(); addRange(to); };
+      more.append(b);
+      ul.append(more);
+    }
+  };
+  addRange(0);
+}
+
+function buildXml(n, alt) {
+  const li = el('li', alt === undefined ? '' : 'alt' + alt);
+  const row = el('div', 'row');
+  if (n.nodeType !== XEL) {
+    if (n.nodeType === XCOMMENT) {
+      row.append(el('span', 'tog', ''), el('span', 'meta', '<!--' + n.nodeValue + '-->'));
+      li.append(row);
+      return li;
+    }
+    const t = n.nodeValue.trim();
+    if (t.length > LONG_STRING || t.includes('\n')) { li.append(stringBlock(t, '', t)); return li; }
+    row.append(el('span', 'tog', ''), el('span', 'str', t));
+    li.append(row);
+    return li;
+  }
+
+  const kids = xKids(n);
+  if (kids.every(xIsText)) { // empty, or only text
+    const t = n.textContent.trim();
+    row.append(el('span', 'tog', ''));
+    li.append(row);
+    if (!kids.length) { row.append(...xmlTag(n, true)); return li; }
+    if (t.length > LONG_STRING || t.includes('\n')) {
+      row.append(...xmlTag(n, false));
+      const close = el('div', 'close');
+      close.append(el('span', 'tog', ''), el('span', 'punc', '</' + n.nodeName + '>'));
+      li.append(stringBlock(t, '', t), close);
+      return li;
+    }
+    row.append(...xmlTag(n, false), el('span', 'str', t), el('span', 'punc', '</' + n.nodeName + '>'));
+    return li;
+  }
+
+  li.classList.add('node', 'collapsed');
+  row.classList.add('fold');
+  const tog = el('span', 'tog', '▸');
+  row.append(tog, ...xmlTag(n, false), el('span', 'preview', xmlPreview(kids)), el('span', 'punc end', '</' + n.nodeName + '>'));
+  li.append(row);
+
+  let built = false;
+  // Shift-click expanding also opens direct children (one level only).
+  const toggle = (openChildren = false) => {
+    if (!built) {
+      built = true;
+      const ul = el('ul');
+      xmlFill(ul, kids);
+      li.append(ul);
+      const close = el('div', 'close');
+      close.append(el('span', 'tog', ''), el('span', 'punc', '</' + n.nodeName + '>'));
+      li.append(close);
+    }
+    li.classList.toggle('collapsed');
+    const collapsed = li.classList.contains('collapsed');
+    tog.textContent = collapsed ? '▸' : '▾';
+    if (!collapsed && (openChildren || kids.length === 1))
+      for (const c of li.querySelectorAll(':scope > ul > li.node.collapsed')) c.toggle();
+  };
+  li.toggle = toggle;
+  row.onclick = e => toggle(e.shiftKey);
+  return li;
+}
+
+function xmlTree(text) {
+  const box = el('div', 'xtree');
+  let root;
+  try { root = parseXml(text); }
+  catch (e) { box.append(el('div', 'err', 'Could not preview this XML: ' + e.message)); return box; }
+  const ul = el('ul');
+  xmlFill(ul, xKids(root));
+  box.append(ul);
+  for (const li of ul.querySelectorAll(':scope > li.node')) li.toggle(); // open the top level
+  return box;
+}
+
+function renderView(pair, v) {
+  const body = v.body;
+  body.replaceChildren();
+  v.allOuts = () => [];
+  const cfg = v.config;
+  if (!cfg) { body.append(el('div', 'err', 'Not configured yet. Click Configure.')); return; }
+  const text = pair.src.value.trim();
+  let data;
+  try { data = JSON.parse(text); }
+  catch (e) { body.append(el('div', 'err', text ? 'Invalid JSON: ' + e.message : 'Nothing to show. Paste some JSON on the Input tab.')); return; }
+  if (!cfg.loop) { body.append(el('div', 'err', 'This view uses an older configuration format. Click Configure and set the loop and conditions again.')); return; }
+  const xml = cfg.mode === 'xml';
+  globalCache = new Map();
+  // One scope per item that passes the conditions; the item is available under the loop's name (default `item`).
+  const as = (cfg.as || '').trim() || 'item';
+  const recs = loopItems(data, cfg.loop).filter(it => passes(it, cfg.filters || [])).map(it => ({ [as]: it }));
+  // XML is built lazily, only for outputs actually shown (or exported); text is cheap and may drop outputs, so it is built up front.
+  let outs;
+  if (xml && cfg.wrap?.on) {
+    // One combined document: every output becomes a child of the root element.
+    const name = xmlName(cfg.wrap.tag || 'root');
+    const inner = recs.flatMap(rec => xmlLines(cfg.xml || [], rec, data, 1) || []);
+    const text = inner.length ? [`<${name}>`, ...inner, `</${name}>`].join('\n') : `<${name}/>`;
+    outs = { length: 1, at: () => text };
+    v.allOuts = () => [text];
+  } else if (xml && hasRequiredXml(cfg.xml || [])) {
+    // Required elements can drop outputs, so the count isn't known until each one is built.
+    const built = recs.map(rec => xmlLines(cfg.xml || [], rec, data)?.join('\n')).filter(o => o !== undefined);
+    outs = { length: built.length, at: i => built[i] };
+    v.allOuts = () => built;
+  } else if (xml) {
+    const cache = new Array(recs.length);
+    outs = { length: recs.length, at: i => cache[i] ??= xmlLines(cfg.xml || [], recs[i], data).join('\n') };
+    v.allOuts = () => recs.map((_, i) => outs.at(i));
+  } else {
+    const built = recs.map(rec => fill(cfg.template, rec, data));
+    outs = { length: built.length, at: i => built[i] };
+    v.allOuts = () => built;
+  }
+  body.append(el('div', 'meta view-count', outs.length + (outs.length === 1 ? ' output' : ' outputs')));
+  // Render in pages so a huge result set doesn't build thousands of DOM nodes at once.
+  // A page stops early once it has produced enough text, and yields to the browser between slices.
+  let shown = 0, busy = false;
+  const more = el('button', 'btn plain');
+  const label = () => {
+    more.hidden = shown >= outs.length;
+    more.textContent = `Show more (${outs.length - shown} remaining)`;
+  };
+  const page = () => {
+    if (busy) return;
+    busy = true;
+    more.hidden = true;
+    let n = 0, chars = 0;
+    const run = () => {
+      if (!more.isConnected) return; // view was re-rendered meanwhile
+      const t0 = performance.now();
+      while (shown < outs.length && n < PAGE && chars < PAGE_CHARS) {
+        const o = outs.at(shown++);
+        chars += o.length; n++;
+        more.before(outputItem(pair, v, o, xml));
+        if (performance.now() - t0 > 25) { setTimeout(run); return; }
+      }
+      busy = false;
+      label();
+    };
+    run();
+  };
+  more.onclick = page;
+  body.append(more);
+  more.hidden = true;
+  page();
+}
+
+const PAGE = 50;          // outputs rendered per page
+const PAGE_CHARS = 200000; // ...or until a page has produced this much text
+const SHOW_CHARS = 20000; // characters of one output shown before "Show all"
+
+// Large outputs are hashed by length plus head and tail, to keep this cheap.
+const hashText = t => {
+  const k = t.length > 4000 ? t.length + t.slice(0, 2000) + t.slice(-2000) : t;
+  let h = 5381;
+  for (let i = 0; i < k.length; i++) h = (h * 33 + k.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+};
+
+// One rendered output entity: text plus a bottom toolbar (copy, minimise, tags). State is keyed by a hash of the text.
+function outputItem(pair, v, text, xml) {
+  const st = v.state[hashText(text)] ||= { min: false, tags: [] };
+  const item = el('div', 'view-item');
+  const body = el('div', 'view-text');
+  const bar = el('div', 'item-bar');
+  const fold = el('button', 'btn plain', '');
+  let all = false;
+  const big = text.length > SHOW_CHARS;
+  const rest = el('button', 'btn plain', `Show all (${text.length.toLocaleString()} chars)`);
+  rest.onclick = () => { all = true; apply(); };
+  // XML outputs have two modes: raw text, or a foldable tree preview (built on first use).
+  let tree = null;
+  const modes = el('div', 'strtabs'), mbtn = {};
+  const expand = el('button', 'btn plain', 'Expand all'), collapse = el('button', 'btn plain', 'Collapse all');
+  expand.onclick = () => setAll(tree, true);
+  collapse.onclick = () => setAll(tree, false);
+  if (xml) for (const [k, label] of [['raw', 'Raw'], ['preview', 'Preview']]) {
+    mbtn[k] = el('button', '', label);
+    mbtn[k].onclick = () => { st.tab = k; apply(); save(); };
+    modes.append(mbtn[k]);
+  }
+  const apply = () => {
+    item.classList.toggle('min', st.min);
+    const pv = xml && st.tab !== 'raw';
+    for (const k in mbtn) mbtn[k].classList.toggle('active', (k === 'preview') === pv);
+    if (pv && !tree) { tree = xmlTree(text); item.append(tree); }
+    if (tree) tree.hidden = !pv || st.min;
+    body.hidden = pv && !st.min;
+    expand.hidden = collapse.hidden = !pv || st.min || !!tree.querySelector(':scope > .err');
+    body.textContent = st.min ? text.slice(0, 400).replace(/\s+/g, ' ').trim()
+      : big && !all ? text.slice(0, SHOW_CHARS) + '\n…' : text;
+    rest.hidden = !big || all || st.min;
+    fold.textContent = st.min ? 'Expand' : 'Minimise';
+  };
+  fold.onclick = () => { st.min = !st.min; apply(); save(); };
+
+  const copy = el('button', 'btn plain', 'Copy');
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(text); copy.textContent = 'Copied'; }
+    catch { copy.textContent = 'Failed'; }
+    setTimeout(() => { copy.textContent = 'Copy'; }, 1200);
+  };
+
+  const tags = el('span', 'item-tags');
+  const drawTags = () => {
+    tags.replaceChildren();
+    st.tags.forEach((t, i) => {
+      const chip = el('span', 'chip', t);
+      const x = el('button', 'chip-x', '×');
+      x.title = 'Remove tag';
+      x.onclick = () => { st.tags.splice(i, 1); drawTags(); save(); };
+      chip.append(x);
+      tags.append(chip);
+    });
+  };
+  const addTag = el('button', 'btn plain', '+ Tag');
+  addTag.onclick = () => {
+    const input = el('input', 'tag-input');
+    input.placeholder = 'tag…';
+    let done = false;
+    const finish = commit => {
+      if (done) return;
+      done = true;
+      const t = input.value.trim();
+      if (commit && t && !st.tags.includes(t)) { st.tags.push(t); drawTags(); save(); }
+      input.replaceWith(addTag);
+    };
+    input.onkeydown = e => { if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); };
+    input.onblur = () => finish(true);
+    addTag.replaceWith(input);
+    input.focus();
+  };
+
+  bar.append(...(xml ? [modes] : []), copy, fold, rest, expand, collapse, addTag, tags);
+  drawTags();
+  item.append(bar, body);
+  apply(); // after the bar/body so the lazily-built tree lands below the toolbar
+  return item;
+}
+
+let draft = null; // { pair, view, loop: path, filters: [path], schema, data, mode, xml }
+
+// Summary of what the loop produces: item counts, how many pass each condition, and the shape of one item.
+function renderPreview() {
+  const box = $('#vc-preview');
+  box.replaceChildren(el('h4', null, 'Preview'));
+  if (draft.data === undefined) { box.append(el('div', null, 'No valid JSON in the input to preview.')); return; }
+  const items = loopItems(draft.data, draft.loop), conds = draft.filters.filter(p => p.length);
+  const kept = items.filter(it => passes(it, conds));
+  const what = draft.loop.length ? draft.loop.join('.') + '[]' : 'the whole document';
+  box.append(el('div', null, `Looping over ${what}: ${items.length} item${items.length === 1 ? '' : 's'}`
+    + (conds.length ? `, ${kept.length} after conditions` : '') + `. ${kept.length} output${kept.length === 1 ? '' : 's'}.`));
+  for (const p of conds) {
+    const n = items.filter(it => !isEmptyVal(valueAt(it, p))).length;
+    box.append(el('div', 'val', `${p.join('.')} is not empty in ${n} of ${items.length} items`));
+  }
+  const node = itemSchema();
+  const lines = [];
+  const walkShape = (nd, indent) => {
+    for (const [k, c] of Object.entries(nd.kids)) {
+      if (lines.length >= 40) return;
+      lines.push('  '.repeat(indent) + k + '  ' + describe(c));
+      if (indent < 2) walkShape(c, indent + 1);
+    }
+  };
+  walkShape(node, 0);
+  if (lines.length) {
+    box.append(el('div', 'sel', 'Each item (' + '$' + asName() + ') has:'));
+    box.append(el('div', 'val', lines.join('\n') + (lines.length >= 40 ? '\n…' : '')));
+  }
+  if (kept[0] !== undefined) {
+    const t = fmt(kept[0]).replace(/\s+/g, ' ');
+    box.append(el('div', 'sel', 'First item:'), el('div', 'val', t.length > 200 ? t.slice(0, 200) + '…' : t));
+  }
+}
+
+let insertTarget = null; // last focused text field in the Transform section
+
+const newXmlNode = () => ({ tag: '', each: '', as: '', attrs: [], text: '', kids: [], required: false });
+
+// ---- `$` autocomplete for XML fields ----
+function mergeSchema(into, from) {
+  from.types.forEach(t => into.types.add(t));
+  into.array ||= from.array;
+  for (const [k, c] of Object.entries(from.kids)) mergeSchema(into.kids[k] ||= newSchema(), c);
+  return into;
+}
+// Schema of an object's entries: { key, value } where value merges all the keys' shapes.
+function entrySchema(node) {
+  const e = newSchema(), value = newSchema();
+  e.array = true;
+  e.types.add('entry');
+  e.kids.key = newSchema(); e.kids.key.types.add('string');
+  for (const c of Object.values(node.kids)) mergeSchema(value, c);
+  e.kids.value = value;
+  return e;
+}
+const isObj = node => node.types.has('object') && !node.array;
+// Children of a schema node, including the `items` entries of an object.
+const kidsOf = node => {
+  const kids = Object.entries(node.kids);
+  if (node.types.has('object') && !('items' in node.kids)) kids.push(['items', entrySchema(node)]);
+  return kids;
+};
+const kidByTok = (node, tok) => { const kid = node && kidsOf(node).find(([k]) => slug(k) === tok); return kid ? kid[1] : null; };
+
+// Schema node a reference points at, given named scope entries (match ids, loop variables); null if unknown.
+function resolveNode(ref, scope) {
+  const [head, ...rest] = ref.split('__');
+  let node = Object.hasOwn(scope, head) ? scope[head] : kidByTok(draft.schema, head);
+  for (const t of rest) node = kidByTok(node, t);
+  return node || null;
+}
+
+// Scope seen by the contents of an element: its parent's, plus its own loop variable.
+const innerScope = (n, outer) => {
+  if (!(n.each || '').trim()) return outer;
+  const node = resolveNode(n.each.trim().replace(/^\$/, ''), outer) || newSchema();
+  return { ...outer, [(n.as || '').trim() || 'child']: isObj(node) ? entrySchema(node) : node }; // repeating over an object iterates its entries
+};
+
+const ac = { box: null, items: [], on: 0, input: null };
+function acClose() { if (ac.box) ac.box.hidden = true; ac.input = null; }
+function acAccept(i = ac.on) {
+  const c = ac.items[i], input = ac.input;
+  if (!c) return;
+  const end = input.selectionStart, start = end - c.partial.length;
+  input.setRangeText(c.name, start, end, 'end');
+  acClose();
+  input.dispatchEvent(new Event('input'));
+}
+function acShow(input, scopeFn) {
+  const m = /\$([A-Za-z0-9_]*)$/.exec(input.value.slice(0, input.selectionStart));
+  if (!m) return acClose();
+  const toks = m[1].split('__'), partial = toks.pop(), scope = scopeFn();
+  let names;
+  if (!toks.length) {
+    names = [...Object.entries(scope), ...kidsOf(draft.schema).map(([k, v]) => [slug(k), v])];
+  } else {
+    const node = resolveNode(toks.join('__'), scope);
+    names = node ? kidsOf(node).map(([k, v]) => [slug(k), v]) : [];
+  }
+  const seen = new Set();
+  ac.items = names.filter(([n]) => n.startsWith(partial) && !seen.has(n) && seen.add(n))
+    .map(([name, node]) => ({ name, partial, node }));
+  if (!ac.items.length || (ac.items.length === 1 && ac.items[0].name === partial)) return acClose();
+  if (!ac.box) { ac.box = el('div'); ac.box.id = 'ac'; $('#view-modal').append(ac.box); }
+  ac.input = input; ac.on = 0;
+  ac.box.replaceChildren(...ac.items.map((c, i) => {
+    const d = el('div', i === 0 ? 'on' : '', '$' + (toks.length ? toks.join('__') + '__' : '') + c.name);
+    d.append(el('small', null, describe(c.node)));
+    d.onmousedown = e => { e.preventDefault(); acAccept(i); };
+    return d;
+  }));
+  const r = input.getBoundingClientRect();
+  ac.box.style.left = r.left + 'px';
+  ac.box.style.top = r.bottom + 2 + 'px';
+  ac.box.hidden = false;
+}
+function acKey(e) {
+  if (!ac.box || ac.box.hidden || ac.input !== e.target) return;
+  const move = d => { e.preventDefault(); ac.on = (ac.on + d + ac.items.length) % ac.items.length; [...ac.box.children].forEach((c, i) => c.classList.toggle('on', i === ac.on)); ac.box.children[ac.on].scrollIntoView({ block: 'nearest' }); };
+  if (e.key === 'ArrowDown') move(1);
+  else if (e.key === 'ArrowUp') move(-1);
+  else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); acAccept(); }
+  else if (e.key === 'Escape') { e.preventDefault(); acClose(); }
+}
+
+function field(obj, key, cls, ph, scopeFn) {
+  const i = el('input', cls);
+  i.placeholder = ph;
+  i.value = obj[key] || '';
+  i.oninput = () => { obj[key] = i.value; if (scopeFn) acShow(i, scopeFn); };
+  if (scopeFn) { i.onkeydown = acKey; i.onblur = acClose; }
+  return i;
+}
+
+function renderXmlEditor() {
+  const box = $('#vc-xml');
+  box.replaceChildren();
+  const draw = (list, into, outer) => list.forEach((n, i) => {
+    const inner = () => innerScope(n, outer());
+    const b = el('div', 'xn');
+    const head = el('div', 'xn-row');
+    head.append(el('span', 'lbl', '<'), field(n, 'tag', 'f-tag', 'tag', inner), el('span', 'lbl', '>'),
+      el('span', 'lbl', 'repeat'), field(n, 'each', 'f-each', '$item__tool_calls', outer),
+      el('span', 'lbl', 'as'), field(n, 'as', 'f-as', 'child'));
+    // A repeat over a document-root path (e.g. $steps) is the same for every output, so it multiplies them.
+    const warn = el('div', 'xn-warn');
+    const lint = () => {
+      const ref = (n.each || '').trim().replace(/^\$/, ''), head = ref.split('__')[0];
+      const global = ref && !Object.hasOwn(outer(), head) && kidByTok(draft.schema, head);
+      warn.hidden = !global;
+      warn.textContent = global ? `$${ref} is a document-root path, so it repeats the whole array in every output. To repeat inside the current item, repeat over one of its fields instead (e.g. $item__field).` : '';
+    };
+    lint();
+    head.addEventListener('input', lint);
+    const text = el('div', 'xn-row');
+    const req = el('input');
+    req.type = 'checkbox';
+    req.checked = !!n.required;
+    req.onchange = () => { n.required = req.checked; };
+    const reqLabel = el('label', 'lbl');
+    reqLabel.title = 'If this element has no content, no output is produced (for a repeated element: instances without content are skipped)';
+    reqLabel.append(req, ' required');
+    text.append(el('span', 'lbl', 'text'), field(n, 'text', 'f-text', 'text, may use $refs', inner), reqLabel);
+    b.append(head, warn, text);
+    (n.attrs ||= []).forEach((a, ai) => {
+      const r = el('div', 'xn-row');
+      const x = el('button', 'btn plain', '×');
+      x.title = 'Remove attribute';
+      x.onclick = () => { n.attrs.splice(ai, 1); renderXmlEditor(); };
+      r.append(el('span', 'lbl', 'attr'), field(a, 'name', 'f-an', 'name'), el('span', 'lbl', '='), field(a, 'value', 'f-av', 'value', inner), x);
+      b.append(r);
+    });
+    const bar = el('div', 'xn-row');
+    const btn = (label, title, fn) => { const x = el('button', 'btn plain', label); x.title = title; x.onclick = () => { fn(); renderXmlEditor(); }; bar.append(x); };
+    btn('+ Attr', 'Add attribute', () => n.attrs.push({ name: '', value: '' }));
+    btn('+ Child', 'Add child element', () => (n.kids ||= []).push(newXmlNode()));
+    btn('↑', 'Move up', () => { if (i) [list[i - 1], list[i]] = [list[i], list[i - 1]]; });
+    btn('↓', 'Move down', () => { if (i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]]; });
+    if (n.kids?.length) btn('Unwrap', 'Remove this element but keep its children in its place', () => list.splice(i, 1, ...n.kids));
+    btn('Remove', 'Remove element', () => list.splice(i, 1));
+    b.append(bar);
+    into.append(b);
+    if (n.kids?.length) {
+      const sub = el('div');
+      sub.style.marginLeft = '16px';
+      b.append(sub);
+      draw(n.kids, sub, inner);
+    }
+  });
+  draw(draft.xml, box, baseScope);
+  if (!draft.xml.length) box.append(el('div', 'meta', 'No elements yet.'));
+}
+
+function setMode(mode) {
+  draft.mode = mode;
+  for (const t of document.querySelectorAll('.mtab')) t.classList.toggle('active', t.dataset.mode === mode);
+  $('#vc-pane-text').hidden = mode !== 'text';
+  $('#vc-pane-xml').hidden = mode !== 'xml';
+  $('#vc-export').hidden = mode === 'xml'; // header/footer apply to text views only
+}
+for (const t of document.querySelectorAll('.mtab')) t.onclick = () => setMode(t.dataset.mode);
+$('#vc-xml-add').onclick = () => { draft.xml.push(newXmlNode()); renderXmlEditor(); };
+$('#view-modal').addEventListener('focusin', e => { if (e.target.matches('#vc-tpl, #vc-xml input')) insertTarget = e.target; });
+
+const asName = () => $('#vc-as').value.trim() || 'item';
+const schemaAt = (root, path) => path.reduce((n, k) => n?.kids[k], root);
+// Keep only the leading part of a path that still exists in the schema.
+const validPath = (root, path) => { const out = []; let n = root; for (const k of path) { if (!n.kids[k]) break; out.push(k); n = n.kids[k]; } return out; };
+// Schema of one loop item (arrays are transparent, so this is the shape of the elements).
+const itemSchema = () => schemaAt(draft.schema, draft.loop) || newSchema();
+
+// Scope for autocomplete and reference lookups: the loop item.
+function baseScope() { return { [asName()]: itemSchema() }; }
+
+function insertRef(text) {
+  const t = insertTarget?.isConnected && !insertTarget.closest('[hidden]') ? insertTarget : draft.mode === 'text' ? $('#vc-tpl') : null;
+  if (!t) { $('#vc-err').textContent = 'Click into an XML field first.'; return; }
+  $('#vc-err').textContent = '';
+  t.setRangeText(text, t.selectionStart, t.selectionEnd, 'end');
+  t.dispatchEvent(new Event('input'));
+  t.focus();
+}
+
+// A chain of dropdowns that picks a path down the schema; edits `path` in place.
+function pathSelects(row, root, path, firstLabel, onChange) {
+  let node = root;
+  for (let i = 0; i <= path.length; i++) {
+    const keys = Object.keys(node.kids);
+    if (!keys.length) break;
+    const sel = el('select');
+    sel.append(new Option(i === 0 ? firstLabel : '(this value)', ''));
+    for (const k of keys) sel.append(new Option(k + '   ' + describe(node.kids[k]), k));
+    sel.value = path[i] ?? '';
+    sel.onchange = () => { path.splice(i); if (sel.value) path.push(sel.value); onChange(); };
+    sel.style.marginLeft = i * 20 + 'px';
+    row.append(sel);
+    if (path[i] === undefined) break;
+    node = node.kids[path[i]];
+  }
+}
+
+function tagButton(ref, hint) {
+  const tag = el('button', 'tag', ref);
+  if (hint) tag.append(el('small', null, '  ' + hint));
+  tag.title = 'Insert ' + ref + ' into the output';
+  tag.onclick = () => insertRef(ref);
+  return tag;
+}
+
+function renderLoop() {
+  const box = $('#vc-loop');
+  box.replaceChildren();
+  const r = el('div', 'sel-row');
+  pathSelects(r, draft.schema, draft.loop, 'Whole document (one output)', () => {
+    const item = itemSchema();
+    draft.filters = draft.filters.map(p => validPath(item, p)).filter(p => p.length); // drop conditions that no longer fit
+    renderLoop();
+  });
+  const foot = el('div', 'foot');
+  foot.style.marginLeft = draft.loop.length * 20 + 'px';
+  foot.append(tagButton('$' + asName(), 'the current item'));
+  r.append(foot);
+  box.append(r);
+  renderFilters();
+}
+
+function renderFilters() {
+  const box = $('#vc-filters');
+  box.replaceChildren();
+  const item = itemSchema();
+  draft.filters.forEach((path, i) => {
+    const r = el('div', 'sel-row');
+    pathSelects(r, item, path, 'Select field…', renderFilters);
+    const foot = el('div', 'foot');
+    foot.style.marginLeft = path.length * 20 + 'px';
+    if (path.length) foot.append(tagButton('$' + asName() + '__' + path.map(slug).join('__')));
+    const del = el('button', 'btn plain del', 'Remove');
+    del.onclick = () => { draft.filters.splice(i, 1); renderFilters(); };
+    foot.append(del);
+    r.append(foot);
+    box.append(r);
+  });
+  if (!draft.filters.length) box.append(el('div', 'meta', 'No conditions: every item is included.'));
+  renderPreview();
+}
+
+const currentCfg = () => ({
+  v: 2, loop: [...draft.loop], as: asName(), filters: draft.filters.filter(p => p.length).map(p => [...p]),
+  template: $('#vc-tpl').value, mode: draft.mode, xml: draft.xml,
+  wrap: { on: $('#vc-wrap').checked, tag: $('#vc-wrap-tag').value.trim() || 'root' },
+  header: $('#vc-header').value, footer: $('#vc-footer').value,
+});
+
+function openConfigure(pair, view) {
+  let schema = newSchema(), err = '', data;
+  const text = pair.src.value.trim();
+  try { const d = JSON.parse(text); schema = buildSchema(d); data = d; if (!text) err = 'No JSON in the input yet.'; }
+  catch (e) { err = text ? 'Invalid JSON: ' + e.message : 'No JSON in the input yet.'; }
+  const cfg = view.config;
+  const loop = validPath(schema, cfg?.loop || []);
+  const item = schemaAt(schema, loop) || newSchema();
+  if (cfg && !cfg.loop) err = 'This view used the older selection format; set the loop and conditions again.';
+  draft = { pair, view, loop, filters: (cfg?.filters || []).map(p => validPath(item, p)).filter(p => p.length), schema, data, mode: 'text', xml: [] };
+  insertTarget = null;
+  $('#vc-diag').hidden = true;
+  $('#vc-err').textContent = err;
+  $('#vc-as').value = cfg?.as || 'item';
+  $('#vc-tpl').value = cfg ? cfg.template || '' : '';
+  $('#vc-header').value = cfg?.header || '';
+  $('#vc-footer').value = cfg?.footer || '';
+  $('#vc-wrap').checked = !!cfg?.wrap?.on;
+  $('#vc-wrap-tag').value = cfg?.wrap?.tag || 'root';
+  draft.xml = structuredClone(cfg?.xml || []);
+  if (!draft.xml.length) draft.xml.push(newXmlNode());
+  renderLoop();
+  renderXmlEditor();
+  setMode(cfg?.mode === 'xml' ? 'xml' : 'text');
+  $('#view-modal').showModal();
+}
+
+$('#vc-as').oninput = renderLoop;
+$('#vc-add').onclick = () => { draft.filters.push([]); renderFilters(); };
+
+// ---- Diagnostics: a trimmed, self-contained report of this view's config, data shape and results ----
+function trimSample(v, depth = 0) {
+  if (typeof v === 'string') return v.length > 80 ? v.slice(0, 80) + `…(${v.length} chars)` : v;
+  if (!isContainer(v)) return v;
+  if (depth > 6) return '…';
+  if (Array.isArray(v)) {
+    const r = v.slice(0, 3).map(x => trimSample(x, depth + 1));
+    if (v.length > 3) r.push(`…(${v.length - 3} more)`);
+    return r;
+  }
+  return Object.fromEntries(Object.entries(v).slice(0, 30).map(([k, x]) => [k, trimSample(x, depth + 1)]));
+}
+function shapeOf(node) {
+  const o = { type: [...node.types].join('|') || 'empty' };
+  if (node.array) o.array = true;
+  if (Object.keys(node.kids).length) o.kids = Object.fromEntries(Object.entries(node.kids).map(([k, c]) => [k, shapeOf(c)]));
+  return o;
+}
+function diagnostics() {
+  const { pair } = draft;
+  const cfg = currentCfg();
+  const rep = { note: 'json-viewer diagnostics (loop format)', config: cfg };
+  try {
+    const data = JSON.parse(pair.src.value.trim());
+    rep.shape = shapeOf(draft.schema);
+    rep.sample = trimSample(data);
+    const items = loopItems(data, cfg.loop), kept = items.filter(it => passes(it, cfg.filters));
+    globalCache = new Map();
+    const outputs = kept.map(it => outputOf(cfg, { [cfg.as]: it }, data));
+    rep.results = {
+      items: items.length,
+      itemsAfterConditions: kept.length,
+      conditions: cfg.filters.map(p => ({ path: p.join('.'), notEmptyIn: items.filter(it => !isEmptyVal(valueAt(it, p))).length })),
+      droppedByRequiredElements: outputs.filter(o => o === null).length,
+      firstItems: kept.slice(0, 2).map(it => trimSample(it)),
+      firstOutputs: outputs.filter(o => o !== null).slice(0, 3).map(o => o.slice(0, 2000)),
+    };
+  } catch (e) { rep.error = String(e && e.stack || e); }
+  return JSON.stringify(rep, null, 2);
+}
+$('#vc-diag-btn').onclick = async () => {
+  const text = diagnostics(), box = $('#vc-diag');
+  try { await navigator.clipboard.writeText(text); box.hidden = true; $('#vc-err').textContent = 'Diagnostics copied (' + text.length.toLocaleString() + ' chars). Review before sharing: it includes trimmed sample data.'; }
+  catch { box.value = text; box.hidden = false; box.select(); $('#vc-err').textContent = 'Could not copy automatically. Select all in the box and copy.'; }
+};
+$('#vc-cancel').onclick = () => $('#view-modal').close();
+$('#vc-save').onclick = () => {
+  const { pair, view } = draft;
+  view.config = currentCfg();
+  $('#view-modal').close();
+  view.dirty = true;
+  show(pair, view);
+};
+
+// XML views export as: optional preamble, then the XML inside a markdown code block.
+function openExport(view) {
+  const xml = (view.allOuts ? view.allOuts() : []).join('\n');
+  const pre = $('#ex-pre');
+  pre.value = view.preamble || '';
+  pre.oninput = () => { view.preamble = pre.value; save(); }; // kept on every edit, so Cancel/Esc don't lose it
+  $('#ex-info').textContent = `The XML (${xml.length.toLocaleString()} characters) will be copied in a code block.`;
+  $('#ex-err').textContent = '';
+  const build = () => {
+    view.preamble = pre.value;
+    const p = pre.value.trim();
+    return (p ? p + '\n\n' : '') + '```xml\n' + xml + '\n```';
+  };
+  $('#ex-dl').onclick = () => {
+    const url = URL.createObjectURL(new Blob([build()], { type: 'text/plain;charset=utf-8' }));
+    const a = el('a');
+    a.href = url;
+    a.download = (view.tab.textContent.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'export') + '.txt';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $('#export-modal').close();
+  };
+  $('#ex-pre-save').onclick = () => {
+    if (!pre.value) { $('#ex-err').textContent = 'The preamble is empty.'; return; }
+    $('#ex-err').textContent = '';
+    const url = URL.createObjectURL(new Blob([pre.value], { type: 'text/plain;charset=utf-8' }));
+    const a = el('a');
+    a.href = url;
+    a.download = 'preamble.txt';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  $('#ex-pre-load').onclick = () => $('#ex-pre-file').click();
+  $('#ex-pre-file').onchange = async e => {
+    const f = e.target.files[0];
+    e.target.value = ''; // so picking the same file again still fires change
+    if (!f) return;
+    try {
+      pre.value = await f.text();
+      pre.oninput();
+      $('#ex-err').textContent = '';
+    } catch { $('#ex-err').textContent = 'Could not read that file.'; }
+  };
+  $('#ex-go').onclick = async () => {
+    const text = build();
+    try { await navigator.clipboard.writeText(text); $('#export-modal').close(); }
+    catch { $('#ex-err').textContent = 'Could not copy to the clipboard.'; }
+  };
+  $('#export-modal').showModal();
+  pre.focus();
+}
+$('#ex-cancel').onclick = () => $('#export-modal').close();
+
+const viewLabel = (pair, v) => pair.name ? `[view ${v.num}] ${pair.name}` : `${pair.defaultOut} · view ${v.num}`;
+
+function addView(pair, saved) {
+  let n = 1;
+  while (pair.views.some(v => v.num === n)) n++;
+  const view = saved ? { num: saved.num, config: saved.config, state: saved.state || {}, preamble: saved.preamble || '' } : { num: n, config: null, state: {}, preamble: '' };
+  view.tab = el('button', 'tab');
+  const last = pair.views.length ? pair.views[pair.views.length - 1].tab : pair.tabOut;
+  last.after(view.tab);
+
+  const sec = view.sec = el('section', 'viewsec');
+  const tools = el('div', 'tools');
+  const cfg = el('button', 'btn plain', 'Configure');
+  const exp = el('button', 'btn plain', 'Export');
+  exp.title = 'Copy all results as one string';
+  exp.onclick = async () => {
+    if (view.config?.mode === 'xml') return openExport(view);
+    const outs = view.allOuts ? view.allOuts() : [];
+    const { header = '', footer = '' } = view.config?.mode === 'xml' ? {} : view.config || {};
+    const text = outs.length > 1 ? [header, ...outs, footer].filter(x => x !== '').join('\n') : outs[0] || '';
+    try { await navigator.clipboard.writeText(text); exp.textContent = 'Copied'; }
+    catch { exp.textContent = 'Failed'; }
+    setTimeout(() => { exp.textContent = 'Export'; }, 1200);
+  };
+  const close = el('button', 'btn plain', 'Close');
+  tools.append(cfg, exp, close);
+  view.body = el('div', 'viewbody');
+  sec.append(tools, view.body);
+  applyColour(sec, pair.hue); applyColour(view.tab, pair.hue);
+  $('main').append(sec);
+
+  cfg.onclick = () => openConfigure(pair, view);
+  close.onclick = () => {
+    if (view.config && !confirm('Close this view and discard its configuration?')) return;
+    pair.views.splice(pair.views.indexOf(view), 1);
+    view.tab.remove(); sec.remove();
+    show(pair, 'out');
+  };
+  view.tab.onclick = () => show(pair, view);
+  pair.views.push(view);
+  view.tab.textContent = viewLabel(pair, view);
+  if (saved) { view.dirty = true; return; }
+  renderView(pair, view);
+  show(pair, view);
+  openConfigure(pair, view);
+}
+
+// ---- Input/output tab pairs ----
+const pairs = [];
+let current = null; // { pair, kind: 'in' | 'out' }
+
+const randomPastel = () => {
+  const used = pairs.map(p => p.hue);
+  let h;
+  for (let i = 0; i < 20; i++) {
+    h = Math.floor(Math.random() * 360);
+    if (used.every(u => Math.min(Math.abs(u - h), 360 - Math.abs(u - h)) >= 30)) break;
+  }
+  return h;
+};
+
+function applyColour(node, hue) {
+  node.style.setProperty('--accent', `hsl(${hue} 70% 75%)`);
+  node.style.setProperty('--accent-bg', `hsl(${hue} 80% 94%)`);
+}
+
+function show(pair, kind) {
+  current = { pair, kind };
+  save();
+  for (const p of pairs) {
+    p.tabIn.classList.toggle('active', p === pair && kind === 'in');
+    p.tabOut.classList.toggle('active', p === pair && kind === 'out');
+    p.secIn.classList.toggle('active', p === pair && kind === 'in');
+    p.secOut.classList.toggle('active', p === pair && kind === 'out');
+    for (const v of p.views) {
+      v.tab.classList.toggle('active', p === pair && kind === v);
+      v.sec.classList.toggle('active', p === pair && kind === v);
+    }
+  }
+  ensure(pair, kind);
+}
+
+function setName(pair, name) {
+  save();
+  pair.name = name.trim();
+  pair.tabIn.textContent = pair.name ? '[in] ' + pair.name : pair.defaultIn;
+  pair.tabOut.textContent = pair.name ? '[out] ' + pair.name : pair.defaultOut;
+  for (const v of pair.views) v.tab.textContent = viewLabel(pair, v);
+}
+
+function openSettings() {
+  const list = $('#pair-list');
+  list.replaceChildren();
+  pairs.forEach((pair, i) => {
+    const row = el('div', 'pair-row');
+    applyColour(row, pair.hue);
+    const input = el('input');
+    input.value = pair.name || '';
+    input.placeholder = 'Pair ' + (i + 1);
+    input.oninput = () => setName(pair, input.value);
+    const del = el('button', 'btn plain del', 'Delete');
+    del.title = 'Delete this tab pair';
+    del.onclick = () => {
+      const label = pair.name || 'Pair ' + (i + 1);
+      if (!confirm('Delete "' + label + '" and its input/output tabs? This cannot be undone.')) return;
+      deletePair(pair);
+      openSettings();
+    };
+    row.append(el('span', 'swatch'), input, del);
+    list.append(row);
+  });
+  if (!pairs.length) list.append(el('div', 'meta', 'No tab pairs.'));
+  if (!$('#settings-modal').open) $('#settings-modal').showModal();
+}
+
+function deletePair(pair) {
+  const i = pairs.indexOf(pair);
+  pairs.splice(i, 1);
+  for (const node of [pair.tabIn, pair.tabOut, pair.secIn, pair.secOut]) node.remove();
+  for (const v of pair.views) { v.tab.remove(); v.sec.remove(); }
+  if (current && current.pair === pair) {
+    const next = pairs[Math.min(i, pairs.length - 1)];
+    current = null;
+    if (next) show(next, 'in');
+  }
+  $('#empty').hidden = pairs.length > 0;
+  save();
+}
+
+function addPair(saved) {
+  let n = 1; // smallest number not used by an existing pair, so default names stay unique
+  while (pairs.some(p => p.num === n)) n++;
+  if (saved) n = saved.num;
+  const hue = saved ? saved.hue : pairs.length === 0 ? 222 : randomPastel(); // first pair keeps the default blue
+  const pair = { hue, num: n, views: [], treeDirty: true };
+  const sfx = n === 1 ? '' : ' ' + n;
+  pair.tabIn = el('button', 'tab', 'Input' + sfx);
+  pair.tabOut = el('button', 'tab', 'Output' + sfx);
+  pair.defaultIn = pair.tabIn.textContent;
+  pair.defaultOut = pair.tabOut.textContent;
+  pair.name = '';
+  $('nav').insertBefore(pair.tabIn, $('#add'));
+  $('nav').insertBefore(pair.tabOut, $('#add'));
+
+  const frag = $('#pair-tpl').content.cloneNode(true);
+  pair.secIn = frag.querySelector('.in');
+  pair.secOut = frag.querySelector('.outsec');
+  pair.src = frag.querySelector('textarea');
+  pair.tree = frag.querySelector('.tree');
+  const out = pair.out = frag.querySelector('.out');
+  const widthBtn = frag.querySelector('.width');
+  frag.querySelector('.view').onclick = () => { render(pair); show(pair, 'out'); };
+  frag.querySelector('.create-view').onclick = () => addView(pair);
+  frag.querySelector('.expand').onclick = () => setAll(pair.tree, true);
+  frag.querySelector('.collapse').onclick = () => setAll(pair.tree, false);
+  widthBtn.onclick = () => {
+    const full = out.classList.toggle('full');
+    widthBtn.textContent = 'Width: ' + (full ? '100%' : '60%');
+    save();
+  };
+  if (saved && saved.full) widthBtn.onclick();
+  for (const node of [pair.tabIn, pair.tabOut, pair.secIn, pair.secOut]) applyColour(node, hue);
+  $('main').append(frag);
+
+  // Paste refreshes the output view in the background; the value isn't updated until after the event.
+  pair.src.addEventListener('input', save);
+  pair.src.addEventListener('paste', () => setTimeout(() => render(pair)));
+  pair.tabIn.onclick = () => show(pair, 'in');
+  pair.tabOut.onclick = () => show(pair, 'out');
+  pairs.push(pair);
+  $('#empty').hidden = true;
+  if (saved) pair.src.value = saved.text || '';
+  if (saved && saved.name) setName(pair, saved.name);
+  if (!saved) { show(pair, 'in'); pair.src.focus(); }
+  return pair;
+}
+
+$('#add').onclick = () => addPair();
+$('#settings').onclick = openSettings;
+// Clicking the backdrop (the dialog element itself, outside its content box) closes it; Esc is built in.
+$('#settings-modal').addEventListener('mousedown', e => {
+  if (e.target !== e.currentTarget) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) e.currentTarget.close();
+});
+const saved = loadState();
+if (saved && Array.isArray(saved.pairs)) restore(saved); else addPair();
+</script>
+</body>
+</html>
