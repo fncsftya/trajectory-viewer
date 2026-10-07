@@ -126,6 +126,7 @@ li.more .btn { margin: 0; padding: 0 8px; font-size: 12px; }
 .xtree { white-space: normal; overflow: auto; }
 .xtree > ul { padding-left: 0; border: none; }
 .xtree .preview { margin-left: 8px; }
+.xtree li.x-blank .row span { color: var(--muted); opacity: .6; }
 .pv { margin-top: 12px; border: 1px solid #000; background: var(--accent-bg); padding: 8px 10px; font-size: 12px; white-space: normal; }
 .pv h4 { margin: 0 0 4px; font-size: 1em; }
 .pv .sel { margin-top: 6px; padding-top: 4px; border-top: 1px dotted #999; }

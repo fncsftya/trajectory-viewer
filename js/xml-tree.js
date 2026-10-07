@@ -92,26 +92,25 @@ function buildXml(n, alt) {
   }
 
   const kids = xKids(n);
-  if (kids.every(xIsText)) { // empty, or only text
-    const t = n.textContent.trim();
-    row.append(el('span', 'tog', ''));
+  const textOnly = kids.length > 0 && kids.every(xIsText);
+  const t = n.textContent.trim();
+  if (!kids.length) { // empty
+    if (!n.attributes.length) li.classList.add('x-blank');
+    row.append(el('span', 'tog', ''), ...xmlTag(n, true));
     li.append(row);
-    if (!kids.length) { row.append(...xmlTag(n, true)); return li; }
-    if (t.length > LONG_STRING || t.includes('\n')) {
-      row.append(...xmlTag(n, false));
-      const close = el('div', 'close');
-      close.append(el('span', 'tog', ''), el('span', 'punc', '</' + n.nodeName + '>'));
-      li.append(stringBlock(t, '', t), close);
-      return li;
-    }
-    row.append(...xmlTag(n, false), el('span', 'str', t), el('span', 'punc', '</' + n.nodeName + '>'));
+    return li;
+  }
+  // Short single-line text stays inline; longer text folds like any other node.
+  if (textOnly && t.length <= LONG_STRING && !t.includes('\n')) {
+    row.append(el('span', 'tog', ''), ...xmlTag(n, false), el('span', 'str', t), el('span', 'punc', '</' + n.nodeName + '>'));
+    li.append(row);
     return li;
   }
 
   li.classList.add('node', 'collapsed');
   row.classList.add('fold');
   const tog = el('span', 'tog', '▸');
-  row.append(tog, ...xmlTag(n, false), el('span', 'preview', xmlPreview(kids)), el('span', 'punc end', '</' + n.nodeName + '>'));
+  row.append(tog, ...xmlTag(n, false), el('span', 'preview', textOnly ? JSON.stringify(t.replace(/\s+/g, ' ').slice(0, MAX_PREVIEW)) + (t.length > MAX_PREVIEW ? '…' : '') : xmlPreview(kids)), el('span', 'punc end', '</' + n.nodeName + '>'));
   li.append(row);
 
   let built = false;

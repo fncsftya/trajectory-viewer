@@ -26,7 +26,8 @@ export function addView(pair, saved) {
     catch { exp.textContent = 'Failed'; }
     setTimeout(() => { exp.textContent = 'Export'; }, 1200);
   };
-  const close = el('button', 'btn plain', 'Close');
+  const close = el('button', 'btn plain', 'Close View');
+  close.style.marginLeft = 'auto';
   tools.append(cfg, exp, close);
   view.body = el('div', 'viewbody');
   sec.append(tools, view.body);
@@ -35,7 +36,7 @@ export function addView(pair, saved) {
 
   cfg.onclick = () => openConfigure(pair, view);
   close.onclick = () => {
-    if (view.config && !confirm('Close this view and discard its configuration?')) return;
+    if (!confirm('Close this view?' + (view.config ? ' Its configuration will be discarded.' : ''))) return;
     pair.views.splice(pair.views.indexOf(view), 1);
     view.tab.remove(); sec.remove();
     show(pair, 'out');
