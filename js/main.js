@@ -1,6 +1,6 @@
 import { $ } from './dom.js';
 import { state, pairs } from './state.js';
-import { saveNow, loadState } from './persistence.js';
+import { saveNow, loadState, dumpState, parseStateFile, replaceState } from './persistence.js';
 import { show, addPair, openSettings } from './tabs.js';
 import { addView } from './views.js';
 import { initEvaluate } from './evaluate.js';
@@ -24,6 +24,24 @@ export function restore(saved) {
 initDiagnostics();
 $('#add').onclick = () => addPair();
 $('#settings').onclick = openSettings;
+$('#state-save').onclick = () => {
+  const a = document.createElement('a');
+  const url = a.href = URL.createObjectURL(new Blob([dumpState()], { type: 'application/json' }));
+  a.download = `json-viewer-state-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+$('#state-load').onclick = () => $('#state-file').click();
+$('#state-file').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const data = parseStateFile(await file.text());
+    if (!confirm('Replace all current tabs, views and evaluation notes with the contents of this file?')) return;
+    replaceState(data);
+  } catch (err) { alert(err.message); }
+};
 // Clicking the backdrop (the dialog element itself, outside its content box) closes it; Esc is built in.
 $('#settings-modal').addEventListener('mousedown', e => {
   if (e.target !== e.currentTarget) return;
