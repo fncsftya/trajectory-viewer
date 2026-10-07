@@ -109,6 +109,21 @@ export function addPair(saved) {
   const widthBtn = frag.querySelector('.width');
   frag.querySelector('.view').onclick = () => { render(pair); show(pair, 'out'); };
   frag.querySelector('.create-view').onclick = () => addView(pair);
+  const menu = frag.querySelector('.split-menu');
+  const closeMenu = () => { menu.hidden = true; };
+  frag.querySelector('.create-from').onclick = e => {
+    e.stopPropagation();
+    if (!menu.hidden) return closeMenu();
+    menu.replaceChildren();
+    for (const p of pairs) for (const v of p.views) {
+      const item = el('button', 'split-item', viewLabel(p, v));
+      item.onclick = () => { closeMenu(); addView(pair, null, v); };
+      menu.append(item);
+    }
+    if (!menu.children.length) menu.append(el('div', 'meta split-empty', 'No views to copy.'));
+    menu.hidden = false;
+  };
+  document.addEventListener('click', closeMenu);
   frag.querySelector('.expand').onclick = () => setAll(pair.tree, true);
   frag.querySelector('.collapse').onclick = () => setAll(pair.tree, false);
   const attachBtn = frag.querySelector('.attach-patch');

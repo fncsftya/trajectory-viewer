@@ -78,8 +78,8 @@
   <div id="ex-preview" class="md" style="width:min(900px,85vw);height:min(55vh,500px);margin:4px 0 10px;overflow:auto;box-sizing:border-box;border:1px solid #000;padding:10px" hidden></div>
   <div class="meta" id="ex-info"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <button class="btn plain" id="ex-cancel">Close</button>
     <span class="meta" id="ex-err" style="margin-right:auto"></span>
-    <button class="btn plain" id="ex-cancel">Cancel</button>
     <button class="btn plain" id="ex-dl" title="Save the export as a text file, for content too large to paste">Download .txt</button>
     <button class="btn blue" id="ex-go">Copy</button>
   </div>
@@ -96,7 +96,7 @@
   </section>
   <section class="outsec">
     <div class="tools">
-      <button class="btn blue create-view" title="Create a view of this output">Create View</button>
+      <span class="split"><button class="btn blue create-view" title="Create a view of this output">Create View</button><button class="btn blue create-from" title="Create a view by copying an existing view's configuration" aria-haspopup="true">▾</button><div class="split-menu" hidden></div></span>
       <button class="btn plain expand">Expand all</button>
       <button class="btn plain collapse">Collapse all</button>
       <button class="btn plain width" title="Toggle output width">Width: 60%</button>

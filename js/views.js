@@ -2,12 +2,17 @@ import { $, el } from './dom.js';
 import { renderView } from './view-render.js';
 import { openConfigure } from './view-config.js';
 import { openExport } from './export.js';
+import { save } from './persistence.js';
 import { applyColour, show, viewLabel } from './tabs.js';
 
-export function addView(pair, saved) {
+export function addView(pair, saved, source) {
   let n = 1;
   while (pair.views.some(v => v.num === n)) n++;
   const view = saved ? { num: saved.num, config: saved.config, state: saved.state || {}, preamble: saved.preamble || '' } : { num: n, config: null, state: {}, preamble: '' };
+  if (source) { // independent deep copy: later edits to either view don't affect the other
+    view.config = structuredClone(source.config);
+    view.preamble = source.preamble;
+  }
   view.tab = el('button', 'tab');
   const last = pair.views.length ? pair.views[pair.views.length - 1].tab : pair.tabOut;
   last.after(view.tab);
@@ -47,5 +52,6 @@ export function addView(pair, saved) {
   if (saved) { view.dirty = true; return; }
   renderView(pair, view);
   show(pair, view);
+  if (source) { save(); return; }
   openConfigure(pair, view);
 }

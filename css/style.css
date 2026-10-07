@@ -147,3 +147,10 @@ textarea.mini { flex: none; height: 64px; white-space: pre-wrap; }
 .ex-attach { color: var(--muted); font-size: 0.85em; margin-top: 0.8em; }
 .ex-attach + pre { margin-top: 2px; }
 .ex-patch { display: block; white-space: pre-wrap; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85em; color: var(--muted); background: var(--accent-bg); padding: 6px 8px; margin: 0.4em 0; }
+.split { position: relative; display: inline-flex; }
+.split .btn { margin: 0; }
+.split .create-from { padding: 2px 6px; border-left-color: #fff; }
+.split-menu { position: absolute; top: 100%; left: 0; z-index: 10; min-width: 100%; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid #000; }
+.split-item { display: block; width: 100%; text-align: left; font: inherit; background: none; border: none; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+.split-item:hover { background: var(--accent-bg); }
+.split-empty { padding: 3px 10px; }
