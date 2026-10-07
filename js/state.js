@@ -5,3 +5,4 @@ export const state = {
   draft: null,   // view being configured: { pair, view, loop: path, filters: [path], schema, data, mode, xml }
   restoring: false,
 };
+export const evaluate = { open: false, groups: [] }; // groups: { target: 'num:out', sections: [{ id, title, text }] }

@@ -1,5 +1,5 @@
 import { STORE_KEY } from './config.js';
-import { state, pairs } from './state.js';
+import { state, pairs, evaluate } from './state.js';
 
 let saveTimer = null;
 
@@ -12,6 +12,7 @@ export function saveNow() {
       full: p.out.classList.contains('full'),
       views: p.views.map(v => ({ num: v.num, config: v.config, state: v.state, preamble: v.preamble })),
     })),
+    evaluate: { open: evaluate.open, groups: evaluate.groups },
     current: state.current && {
       pair: pairs.indexOf(state.current.pair),
       kind: typeof state.current.kind === 'string' ? state.current.kind : state.current.kind.num,

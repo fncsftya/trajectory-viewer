@@ -8,11 +8,19 @@
 </head>
 <body>
 <nav>
+  <button class="btn plain" id="evaluate" aria-pressed="false" title="Toggle the evaluation write-up sidebar">Evaluate</button>
   <button class="add" id="add" title="New input/output pair">+</button>
   <span class="spacer"></span>
   <button class="btn plain" id="settings">Settings</button>
 </nav>
-<main><div class="empty" id="empty" hidden>No tabs yet. Click + to add an input/output pair.</div></main>
+<div id="layout">
+  <aside id="eval-side" hidden>
+    <div class="tools"><button class="btn blue" id="eval-setup">Setup</button><button class="btn plain" id="eval-add" hidden title="Add a section to the selected tab only">+ Add section</button></div>
+    <div class="mtabs" id="eval-groups"></div>
+    <div id="eval-sections"></div>
+  </aside>
+  <main><div class="empty" id="empty" hidden>No tabs yet. Click + to add an input/output pair.</div></main>
+</div>
 <dialog id="settings-modal">
   <h2>Settings</h2>
   <div id="pair-list"></div>
@@ -65,6 +73,18 @@
     <button class="btn plain" id="vc-cancel">Cancel</button>
     <button class="btn blue" id="vc-save">Save</button>
   </footer>
+</dialog>
+<dialog id="eval-modal">
+  <h2>Evaluate setup</h2>
+  <h3 class="eh">1. Output tabs to evaluate</h3>
+  <div id="es-tabs"></div>
+  <h3 class="eh">2. Sections for each tab</h3>
+  <div id="es-secs"></div>
+  <div><button class="btn plain" id="es-add">+ Add section</button></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <button class="btn plain" id="es-cancel">Cancel</button>
+    <button class="btn blue" id="es-ok">OK</button>
+  </div>
 </dialog>
 <dialog id="export-modal">
   <h2>Export XML</h2>
