@@ -18,7 +18,7 @@ export function addView(pair, saved) {
   const exp = el('button', 'btn plain', 'Export');
   exp.title = 'Copy all results as one string';
   exp.onclick = async () => {
-    if (view.config?.mode === 'xml') return openExport(view);
+    if (view.config?.mode === 'xml') return openExport(pair, view);
     const outs = view.allOuts ? view.allOuts() : [];
     const { header = '', footer = '' } = view.config?.mode === 'xml' ? {} : view.config || {};
     const text = outs.length > 1 ? [header, ...outs, footer].filter(x => x !== '').join('\n') : outs[0] || '';

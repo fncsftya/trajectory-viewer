@@ -111,6 +111,37 @@ export function addPair(saved) {
   frag.querySelector('.create-view').onclick = () => addView(pair);
   frag.querySelector('.expand').onclick = () => setAll(pair.tree, true);
   frag.querySelector('.collapse').onclick = () => setAll(pair.tree, false);
+  const attachBtn = frag.querySelector('.attach-patch');
+  const detachBtn = frag.querySelector('.detach-patch');
+  const patchFile = frag.querySelector('.patch-file');
+  pair.patch = null; // { name, text }: the output patch linked to this pair
+  pair.setPatch = patch => {
+    pair.patch = patch;
+    attachBtn.textContent = patch ? 'Patch: ' + patch.name : 'Attach patch';
+    attachBtn.title = patch ? 'Replace the attached patch' : 'Attach an output .patch or .diff file to this tab pair';
+    detachBtn.hidden = !patch;
+    save();
+  };
+  attachBtn.onclick = async () => {
+    if (!window.showOpenFilePicker) { patchFile.click(); return; }
+    try {
+      const [h] = await showOpenFilePicker({ types: [{ description: 'Patch/diff files', accept: { 'text/plain': ['.patch', '.diff'] } }] });
+      takePatch(await h.getFile());
+    } catch (e) {
+      if (e.name !== 'AbortError') patchFile.click(); // picker unavailable here: fall back to the input
+    }
+  };
+  detachBtn.onclick = () => pair.setPatch(null);
+  const takePatch = async f => {
+    if (!/\.(patch|diff)$/i.test(f.name)) { alert('Please choose a .patch or .diff file.'); return; }
+    try { pair.setPatch({ name: f.name, text: await f.text() }); }
+    catch { alert('Could not read that file.'); }
+  };
+  patchFile.onchange = () => {
+    const f = patchFile.files[0];
+    patchFile.value = ''; // so picking the same file again still fires change
+    if (f) takePatch(f);
+  };
   widthBtn.onclick = () => {
     const full = out.classList.toggle('full');
     widthBtn.textContent = 'Width: ' + (full ? '100%' : '60%');
@@ -128,6 +159,7 @@ export function addPair(saved) {
   pairs.push(pair);
   $('#empty').hidden = true;
   if (saved) pair.src.value = saved.text || '';
+  if (saved && saved.patch) pair.setPatch(saved.patch);
   if (saved && saved.name) setName(pair, saved.name);
   if (!saved) { show(pair, 'in'); pair.src.focus(); }
   return pair;

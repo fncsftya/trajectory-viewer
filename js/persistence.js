@@ -8,7 +8,7 @@ export function saveNow() {
   if (state.restoring) return;
   const snapshot = {
     pairs: pairs.map(p => ({
-      hue: p.hue, num: p.num, name: p.name, text: p.src.value,
+      hue: p.hue, num: p.num, name: p.name, text: p.src.value, patch: p.patch,
       full: p.out.classList.contains('full'),
       views: p.views.map(v => ({ num: v.num, config: v.config, state: v.state, preamble: v.preamble })),
     })),

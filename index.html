@@ -67,13 +67,15 @@
 </dialog>
 <dialog id="export-modal">
   <h2>Export XML</h2>
-  <div style="display:flex;align-items:center;gap:8px">
+  <div class="mtabs"><button class="ex-tab active" data-tab="edit">Edit</button><button class="ex-tab" data-tab="preview">Preview</button></div>
+  <div style="display:flex;align-items:center;gap:8px" id="ex-edit-bar">
     <label class="meta" for="ex-pre" style="margin-right:auto">Preamble (optional), copied before the XML</label>
     <button class="btn plain" id="ex-pre-load" title="Replace the preamble with the contents of a text file">Load…</button>
     <button class="btn plain" id="ex-pre-save" title="Save the preamble to a text file">Save…</button>
     <input type="file" id="ex-pre-file" accept=".txt,.md,text/plain,text/markdown" hidden>
   </div>
-  <textarea id="ex-pre" class="mini" spellcheck="false" style="width:min(560px,80vw);height:120px;margin:4px 0 10px"></textarea>
+  <textarea id="ex-pre" class="mini" spellcheck="false" style="width:min(900px,85vw);height:min(55vh,500px);margin:4px 0 10px"></textarea>
+  <div id="ex-preview" class="md" style="width:min(900px,85vw);height:min(55vh,500px);margin:4px 0 10px;overflow:auto;box-sizing:border-box;border:1px solid #000;padding:10px" hidden></div>
   <div class="meta" id="ex-info"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
     <span class="meta" id="ex-err" style="margin-right:auto"></span>
@@ -86,6 +88,9 @@
   <section class="in">
     <div class="tools">
       <button class="btn blue view">View</button>
+      <button class="btn plain attach-patch" title="Attach an output .patch or .diff file to this tab pair">Attach patch</button>
+      <button class="btn plain detach-patch" title="Remove the attached patch" hidden>✕</button>
+      <input type="file" class="patch-file" accept=".patch,.diff" hidden>
     </div>
     <textarea spellcheck="false" placeholder="Paste JSON here…"></textarea>
   </section>

@@ -3,9 +3,9 @@ import { state } from './state.js';
 import { newSchema, describe, slug, entrySchema, isObj, kidsOf, kidByTok } from './schema.js';
 
 // Schema node a reference points at, given named scope entries (match ids, loop variables); null if unknown.
-export function resolveNode(ref, scope) {
+export function resolveNode(ref, scope, schema = state.draft.schema) {
   const [head, ...rest] = ref.split('__');
-  let node = Object.hasOwn(scope, head) ? scope[head] : kidByTok(state.draft.schema, head);
+  let node = Object.hasOwn(scope, head) ? scope[head] : kidByTok(schema, head);
   for (const t of rest) node = kidByTok(node, t);
   return node || null;
 }
@@ -27,22 +27,37 @@ function acAccept(i = ac.on) {
   acClose();
   input.dispatchEvent(new Event('input'));
 }
-function acShow(input, scopeFn) {
+// Viewport position just below the caret of a textarea, measured with a hidden copy of its text.
+function caretPos(ta) {
+  const r = ta.getBoundingClientRect(), cs = getComputedStyle(ta), m = el('div'), mark = el('span', '', '.');
+  for (const k of ['font', 'padding', 'border', 'letterSpacing', 'tabSize', 'lineHeight', 'whiteSpace', 'overflowWrap'])
+    m.style[k] = cs[k];
+  Object.assign(m.style, { position: 'fixed', left: '0', top: '0', visibility: 'hidden', boxSizing: 'border-box', width: r.width + 'px' });
+  m.textContent = ta.value.slice(0, ta.selectionStart);
+  m.append(mark);
+  document.body.append(m);
+  const x = mark.offsetLeft - ta.scrollLeft, y = mark.offsetTop - ta.scrollTop + mark.offsetHeight;
+  m.remove();
+  return { left: r.left + Math.min(x, r.width - 160), top: r.top + Math.min(y, r.height) };
+}
+function acShow(input, scopeFn, schemaFn = () => state.draft.schema) {
   const m = /\$([A-Za-z0-9_]*)$/.exec(input.value.slice(0, input.selectionStart));
   if (!m) return acClose();
-  const toks = m[1].split('__'), partial = toks.pop(), scope = scopeFn();
+  const toks = m[1].split('__'), partial = toks.pop(), scope = scopeFn(), schema = schemaFn();
   let names;
   if (!toks.length) {
-    names = [...Object.entries(scope), ...kidsOf(state.draft.schema).map(([k, v]) => [slug(k), v])];
+    names = [...Object.entries(scope), ...kidsOf(schema).map(([k, v]) => [slug(k), v])];
   } else {
-    const node = resolveNode(toks.join('__'), scope);
+    const node = resolveNode(toks.join('__'), scope, schema);
     names = node ? kidsOf(node).map(([k, v]) => [slug(k), v]) : [];
   }
   const seen = new Set();
   ac.items = names.filter(([n]) => n.startsWith(partial) && !seen.has(n) && seen.add(n))
     .map(([name, node]) => ({ name, partial, node }));
   if (!ac.items.length || (ac.items.length === 1 && ac.items[0].name === partial)) return acClose();
-  if (!ac.box) { ac.box = el('div'); ac.box.id = 'ac'; $('#view-modal').append(ac.box); }
+  if (!ac.box) { ac.box = el('div'); ac.box.id = 'ac'; }
+  const host = input.closest('dialog') || document.body;
+  if (ac.box.parentNode !== host) host.append(ac.box);
   ac.input = input; ac.on = 0;
   ac.box.replaceChildren(...ac.items.map((c, i) => {
     const d = el('div', i === 0 ? 'on' : '', '$' + (toks.length ? toks.join('__') + '__' : '') + c.name);
@@ -50,9 +65,9 @@ function acShow(input, scopeFn) {
     d.onmousedown = e => { e.preventDefault(); acAccept(i); };
     return d;
   }));
-  const r = input.getBoundingClientRect();
+  const r = input.tagName === 'TEXTAREA' ? caretPos(input) : input.getBoundingClientRect();
   ac.box.style.left = r.left + 'px';
-  ac.box.style.top = r.bottom + 2 + 'px';
+  ac.box.style.top = (r.bottom ?? r.top) + 2 + 'px';
   ac.box.hidden = false;
 }
 function acKey(e) {
@@ -71,4 +86,11 @@ export function field(obj, key, cls, ph, scopeFn) {
   i.oninput = () => { obj[key] = i.value; if (scopeFn) acShow(i, scopeFn); };
   if (scopeFn) { i.onkeydown = acKey; i.onblur = acClose; }
   return i;
+}
+
+// Autocomplete `$refs` in a free-standing text field or textarea. scopeFn: named entries; schemaFn: the document schema.
+export function attachAutocomplete(input, scopeFn, schemaFn) {
+  input.addEventListener('input', () => acShow(input, scopeFn, schemaFn));
+  input.addEventListener('keydown', acKey);
+  input.addEventListener('blur', acClose);
 }
